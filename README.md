@@ -2,7 +2,7 @@
 
 My kit of **Claude Code** tools — agents, skills, and config that install into `~/.claude` and work in any local project. Each one is a top-level folder with its own README and a one-line installer. Take the whole set, or just the one you want, by sending a README to Claude Code and saying *"install this"*.
 
-The set has a shape: **bootstrap** gets a machine and a repo ready, **cmux** is the desktop environment you run Claude Code in, **qa**, **tickets**, and **morning** are the everyday helpers, and **loop** is the autonomous capstone that reuses qa and tickets to take a ticket all the way to an approved PR on its own.
+The set has a shape: **bootstrap** gets a machine and a repo ready, **cmux** is the desktop environment you run Claude Code in, **qa**, **tickets**, and **morning** are the everyday helpers, **team** is the crew of planner/engineer/reviewer/tester subagents the rest lean on, and **loop** is the autonomous capstone that reuses qa, tickets, and the team to take a ticket all the way to an approved PR on its own.
 
 ## How the tools fit together
 
@@ -17,14 +17,17 @@ flowchart TD
     QA["qa — does it work?<br/>does it match the design?"]
     TIX["tickets — human-readable<br/>Linear / Jira tickets"]
   end
+  TEAM["team — crew of subagents:<br/>plan · build · review · test"]
   LOOP["loop — autonomous:<br/>investigate → build → QA → PR → review"]
   BOOT --> CC
   CMUX --> CC
   CC --> QA
   CC --> TIX
+  CC --> TEAM
   CC --> LOOP
   LOOP -->|its QA step| QA
   LOOP -->|its ticket step| TIX
+  LOOP -->|dispatches| TEAM
   LOOP -->|one surface per task| CMUX
 ```
 
@@ -37,6 +40,7 @@ flowchart TD
 | [**qa**](qa/README.md) | A `manual-qa` agent that drives a real browser to check a feature *works* (functional, via Playwright) or *matches the design* (Figma / pixel-perfect). Remembers per-project URL + login + DB, asks once. | *"install this: https://github.com/unisol1020/claude-tools/blob/main/qa/README.md"* |
 | [**tickets**](tickets/README.md) | A `ticket` skill that writes **human-readable** Linear / Jira tickets (not AI slop) — repro + how-to-verify + where the problem lives — pulls Figma/Sentry/Slack context from connected MCPs, and posts test results as a comment. | *"install this: https://github.com/unisol1020/claude-tools/blob/main/tickets/README.md"* |
 | [**morning**](morning/README.md) | A `morning` skill — *"do my morning routine"* / `/morning` — that triages the three things you wake up to into one scannable briefing: open PRs in your repos that aren't yours (reviewed against each project's `CLAUDE.md` + the linked ticket + logic/quality), your assigned Linear/Jira tickets sorted urgency-then-effort and grouped by project, and Slack mentions / DMs / unread. Ships a standalone **`review-prs`** skill too — *"review all PRs"* / *"review this PR: <url>"*. PR comments are held for your OK before anything posts. Reuses qa's reviewer agents, the `ticket` config, and `loop`. | *"install this: https://github.com/unisol1020/claude-tools/blob/main/morning/README.md"* |
+| [**team**](team/README.md) | The **crew of subagents** Claude Code delegates to — `architect` (plans), `backend-engineer` / `frontend-engineer` (build), `automation-qa` (writes tests), and `backend-reviewer` / `frontend-reviewer` / `security-reviewer` (review). Claude picks the right one automatically; the `loop` and the architect's babysit protocol dispatch exactly this crew. (`manual-qa` lives in `qa/`, `devops` in `loop/`.) | *"install this: https://github.com/unisol1020/claude-tools/blob/main/team/README.md"* |
 | [**loop**](loop/README.md) | An autonomous **loop engine** + an **investigator**. Say *"get 10 tickets from Linear and check them"* → it triages into a checkbox list (run / skip / investigate-only), and on your OK fans out one loop per ticket. Each loop: plan once → implement → `CLAUDE.md` rule-check → manual QA → PR to the dev branch → poll comments → stop on approval. Per-task git worktree + isolated Docker stack (own DB, own ports). Reuses **qa**, **tickets**, and `/loop`. | *"install this: https://github.com/unisol1020/claude-tools/blob/main/loop/README.md"* |
 
 Each tool's README has its own self-install block, so you can install them one at a time. The `loop` tool reuses `qa` and `tickets`, so install those alongside it.
@@ -59,7 +63,7 @@ You don't run anything. Paste this file (or its URL) into **Claude Code** and sa
 >    ```
 >    Each installer symlinks its agent/skill into `~/.claude/` (so a later `git pull` updates everything) and registers or checks for the MCP it needs. They're idempotent — safe to re-run.
 > 4. **Verify:** `ls -la ~/.claude/agents ~/.claude/skills` shows symlinks pointing into `~/.claude-tools/*`.
-> 5. **Report back to the user** — confirm what installed (bootstrap, cmux, qa, tickets, loop), call out any `✗` dependency lines an installer printed (with the `brew`/`npm` fix), tell them to **restart Claude Code once** so agents / skills / MCP tools load, then summarize each tool in a line or two (paraphrase the per-tool READMEs; keep it short).
+> 5. **Report back to the user** — confirm what installed (bootstrap, cmux, qa, tickets, morning, team, loop), call out any `✗` dependency lines an installer printed (with the `brew`/`npm` fix), tell them to **restart Claude Code once** so agents / skills / MCP tools load, then summarize each tool in a line or two (paraphrase the per-tool READMEs; keep it short).
 >
 > Update later with `git -C ~/.claude-tools pull` (symlinks pick it up). Uninstall: see each tool's README, or the bottom of this file.
 
