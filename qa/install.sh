@@ -5,7 +5,6 @@
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$DIR/.." && pwd)"
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
 mkdir -p "$CLAUDE_DIR/agents" "$CLAUDE_DIR/skills"
@@ -14,8 +13,7 @@ mkdir -p "$CLAUDE_DIR/agents" "$CLAUDE_DIR/skills"
 link() { rm -rf "$2"; ln -s "$1" "$2"; echo "  linked $(basename "$2")"; }
 
 echo "Installing claude-qa into $CLAUDE_DIR ..."
-# manual-qa now lives in team/ (the crew of agents); qa still installs it so qa is self-sufficient
-link "$ROOT/team/agents/manual-qa.md" "$CLAUDE_DIR/agents/manual-qa.md"
+link "$DIR/agents/manual-qa.md"      "$CLAUDE_DIR/agents/manual-qa.md"
 link "$DIR/skills/playwright-qa"     "$CLAUDE_DIR/skills/playwright-qa"
 link "$DIR/skills/qa-run"            "$CLAUDE_DIR/skills/qa-run"
 

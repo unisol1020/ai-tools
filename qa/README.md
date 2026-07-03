@@ -37,7 +37,7 @@ The login ping is the one interactive escape hatch: if a flow needs a login but 
 
 | Piece | Type | Role |
 |-------|------|------|
-| `../team/agents/manual-qa.md` | global agent | drives the browser like a human QA; reports PASS/FAIL; no code edits, no test files. Lives in [`team/`](../team/README.md) with the rest of the crew; this installer links it so `qa` is self-sufficient. |
+| `agents/manual-qa.md` | global agent | drives the browser like a human QA; reports PASS/FAIL; no code edits, no test files |
 | `skills/qa-run/` | skill | orchestrator: gathers + remembers per-app URL/login + project DB, then invokes `manual-qa` |
 | `skills/playwright-qa/` | skill | the headless-browser playbook — the navigate→snapshot→act→assert loop and when to use it vs cmux |
 | `templates/qa.local.json.example` | template | shape of the per-project memory file |
