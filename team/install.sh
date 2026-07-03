@@ -3,9 +3,9 @@
 # agents into ~/.claude/agents so they're available in every local project.
 # Re-runnable; symlinks mean `git pull` updates everything automatically.
 #
-# NOT installed here (they live with their own tools, on purpose):
-#   • manual-qa  → in qa/    (install qa/)
-#   • devops     → in loop/  (install loop/)
+# manual-qa lives here too, but only functions with qa/'s Playwright MCP + qa-run skill.
+# NOT installed here (infra, lives with its tool on purpose):
+#   • devops  → in loop/  (install loop/)
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,6 +29,7 @@ Done. Next:
        "plan this feature"                 → architect  (plans; never implements)
        "add the endpoint / build the page" → backend-engineer / frontend-engineer
        "write tests for this"              → automation-qa
+       "QA this in the browser"            → manual-qa   (needs qa/'s Playwright MCP + qa-run skill)
        reviews run after changes           → backend-reviewer / frontend-reviewer / security-reviewer
 
 Optional but recommended for the architect's Phase 1 "grill" (interrogation) step:
@@ -37,7 +38,8 @@ Optional but recommended for the architect's Phase 1 "grill" (interrogation) ste
   a requirement. Install one by dropping a grill-me skill into ~/.claude/skills, then restart.
 
 Pairs with the rest of claude-tools: the loop/ engine and the architect's babysit protocol
-dispatch exactly these agents (plan → implement → test → review), and qa/ adds manual-qa.
+dispatch exactly these agents (plan → implement → test → review). manual-qa needs qa/ for
+its browser (Playwright MCP + qa-run skill) — install qa/ to use it.
 
 Requirements: Claude Code. Individual agents use whatever MCPs are connected (Supabase,
 Playwright, trackers, Figma, …) — none are required to install.
