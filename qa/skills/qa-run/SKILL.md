@@ -49,9 +49,11 @@ The interactive steps below apply only to **human-initiated** runs (someone asks
    - From the user's ask ("test **web-a** login", "check **web-b**") or from `git diff --name-only` (which `apps/*` changed).
    - If still ambiguous and there are multiple apps → **AskUserQuestion**: "Which app is in scope for this run?" (list detected apps + "all").
 
-5. **URL gate (per in-scope app).** For each app in scope, if its `url` isn't saved:
-   - **AskUserQuestion / prompt**: "What URL should I use for **<app>**?" — pre-fill the detected port (e.g. `http://localhost:3000`). On a monorepo first-run, offer to capture URLs for **all** detected apps at once so it remembers them all. Write each into `apps[].url`.
+5. **URL gate (per in-scope app) — LOCAL FIRST.** For each app in scope, if its `url` isn't saved:
+   - **Probe local before asking.** Read `.claude/qa.local.json` and probe the app's expected local dev port(s) — from its `package.json` dev script (`--port`), the framework default, or the common set (`3000 3001 8081 5173 4321 19006`) — with `curl -sI` / `lsof -i -P | grep LISTEN`. If a local server is already serving the app, use it and skip the prompt.
+   - Nothing local running → **AskUserQuestion / prompt**: "What URL should I use for **<app>**?" — pre-fill the detected port (e.g. `http://localhost:3000`). On a monorepo first-run, offer to capture URLs for **all** detected apps at once so it remembers them all. Write each into `apps[].url`.
    - Prefer a live port: confirm with `curl -sI <url>` / `lsof -i -P | grep LISTEN`. If the server's down, ask whether to start it (background it, wait for the port) — don't assume.
+   - **A deployed preview / dev / staging URL is a LAST resort** — reach for it only when no local app is reachable (and per the non-localhost risk warning below). Never jump to a preview link while a local server is (or could be) running.
    - **Non-localhost target = the user's risk.** localhost / `127.0.0.1` / `0.0.0.0` is the safe default. The user *may* point QA at any other host (staging, a deployed preview, even prod), and you should allow it — but if the URL isn't local, **warn once before using it**: QA drives a real browser against a live, possibly shared environment, so it can submit forms, trigger writes, send emails, and hit real services and rate limits. State plainly that **all risk is on the user**, proceed only on their explicit confirmation, then save the URL as given (re-warning isn't needed once it's saved). Don't refuse it — just make the risk explicit.
 
 6. **Credentials gate (per in-scope app).** For each in-scope app:
