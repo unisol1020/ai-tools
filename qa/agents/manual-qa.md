@@ -25,9 +25,23 @@ Before you open a browser, decide the URL to hit. **A locally running app always
 
 ---
 
+## Step 0 (both modes) — verify the Playwright MCP, install it if missing
+
+manual-qa runs on the Playwright MCP: it's **required** for FUNCTIONAL mode and the guaranteed cross-platform **capture fallback** for DESIGN. Before planning either mode, check your tool list for `mcp__playwright__*`. If present, proceed. If ABSENT, do not stop and do not just report it — recover in this order:
+
+1. **Check registration & install:** run `claude mcp get playwright`. If it's not registered, install it now — `claude mcp add -s user playwright -- npx @playwright/mcp@latest --headless` (the same command `install.sh` uses). Newly registered MCP tools only surface after a session restart — note that in the report.
+2. **Registered but not surfaced into this session** (tools can't appear mid-run): fall back to driving the same Playwright engine directly — write a throwaway driver script in the scratchpad (NEVER in the repo, never a committed test file) that `require()`s `playwright` from the project's `node_modules` (or a global install), and run it with Bash + node. Keep full coverage: `page.on('console')` + `page.on('pageerror')` capture, screenshots, `page.route()` for forced error/slow states, viewport sizes for mobile, `storageState` to persist login between stages.
+3. Whichever path you used, say so explicitly at the top of the report.
+
+DESIGN mode can also capture via cmux / Claude Desktop / Chrome (see below), so if one of those is available you don't strictly need the MCP — but still install it per step 1 so the fallback exists.
+
+---
+
 ## FUNCTIONAL mode — "does it work" (Playwright MCP, default)
 
-Headless, fast, deterministic. See the `playwright-qa` skill for the full playbook. Loop: `browser_navigate → browser_snapshot` (elements carry stable `ref`s) `→ browser_click/browser_type {ref} → re-snapshot/assert`, with `browser_console_messages` + `browser_network_requests` for errors. Use Playwright's network mocking to force error states, `browser_resize`/device for mobile, offline/geo where relevant. If the `mcp__playwright__*` tools are absent → say so (the Playwright MCP isn't installed/surfaced; parent may need `./install.sh` + a restart).
+Headless, fast, deterministic. See the `playwright-qa` skill for the full playbook. Loop: `browser_navigate → browser_snapshot` (elements carry stable `ref`s) `→ browser_click/browser_type {ref} → re-snapshot/assert`, with `browser_console_messages` + `browser_network_requests` for errors. Use Playwright's network mocking to force error states, `browser_resize`/device for mobile, offline/geo where relevant.
+
+Ensure the Playwright MCP first — see **Step 0** above (verify `mcp__playwright__*`; install + fall back if missing). Functional mode requires it.
 
 ### Think first — plan like a senior QA (before you touch the browser)
 
@@ -62,7 +76,7 @@ Try in order; fall through to the next if the tool isn't available to you:
 2. **Claude Desktop internal browser** — if you're running inside Claude Desktop and a built-in browser/navigate+screenshot tool is exposed to you, use it.
 3. **Chrome connection (Claude for Chrome)** — if a Chrome-extension browser tool that can open a tab and screenshot is available to you, use it.
 4. **Playwright MCP (headless Chromium)** — always-available cross-platform fallback: `browser_navigate {url}` → set viewport to the design frame's width (`browser_resize`) for a fair comparison → `browser_take_screenshot { fullPage }`. Note: headless Chromium, not real-Safari pixels — fine for layout/spacing/Figma-frame comparison.
-5. **None available** → report to the user: *"To verify design I need a way to capture the running UI — run inside **cmux** (macOS, best fidelity), use a **Claude Desktop** or **Chrome-connected** browser, or install the **Playwright MCP** (`./install.sh` + restart). None is available, so I can't compare to the design."* Don't fake a result.
+5. **None available** → report to the user: *"To verify design I need a way to capture the running UI — run inside **cmux** (macOS, best fidelity), use a **Claude Desktop** or **Chrome-connected** browser, or the **Playwright MCP**. If I just registered Playwright in Step 0, restart the session so its tools surface, then re-run. None is available right now, so I can't compare to the design."* Don't fake a result.
 
 ### Step 3 — compare at the ≥90% / 1:1 bar
 
