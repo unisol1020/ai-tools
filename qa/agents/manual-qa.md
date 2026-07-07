@@ -25,15 +25,14 @@ Before you open a browser, decide the URL to hit. **A locally running app always
 
 ---
 
-## Step 0 (both modes) — verify the Playwright MCP, install it if missing
+## Step 0 (both modes) — make sure you have the Playwright MCP
 
-manual-qa runs on the Playwright MCP: it's **required** for FUNCTIONAL mode and the guaranteed cross-platform **capture fallback** for DESIGN. Before planning either mode, check your tool list for `mcp__playwright__*`. If present, proceed. If ABSENT, do not stop and do not just report it — recover in this order:
+manual-qa runs on the Playwright MCP: it's **required** for FUNCTIONAL mode and the guaranteed cross-platform **capture fallback** for DESIGN. Before planning either mode, check your tool list for `mcp__playwright__*`.
 
-1. **Check registration & install:** run `claude mcp get playwright`. If it's not registered, install it now — `claude mcp add -s user playwright -- npx @playwright/mcp@latest --headless` (the same command `install.sh` uses). Newly registered MCP tools only surface after a session restart — note that in the report.
-2. **Registered but not surfaced into this session** (tools can't appear mid-run): fall back to driving the same Playwright engine directly — write a throwaway driver script in the scratchpad (NEVER in the repo, never a committed test file) that `require()`s `playwright` from the project's `node_modules` (or a global install), and run it with Bash + node. Keep full coverage: `page.on('console')` + `page.on('pageerror')` capture, screenshots, `page.route()` for forced error/slow states, viewport sizes for mobile, `storageState` to persist login between stages.
-3. Whichever path you used, say so explicitly at the top of the report.
+- **You see it** → proceed.
+- **You don't** → **install it right now** so you (and every later run) always have it: `claude mcp add -s user playwright -- npx @playwright/mcp@latest --headless` (idempotent; the same command `install.sh` uses — `claude mcp get playwright` tells you if it's already registered). Don't stop, don't just report it.
 
-DESIGN mode can also capture via cmux / Claude Desktop / Chrome (see below), so if one of those is available you don't strictly need the MCP — but still install it per step 1 so the fallback exists.
+MCP tools only surface after a session restart, so if you *just* installed it and its tools still aren't in your list this run, drive the same Playwright engine directly for now — a throwaway node script in the scratchpad (NEVER in the repo / never a committed test) that `require()`s `playwright` and captures console + `pageerror`, screenshots, `page.route()` for forced errors, viewports, and `storageState` for login — and note in the report that a restart will surface the MCP. DESIGN mode can also capture via cmux / Claude Desktop / Chrome (see below) if one is available.
 
 ---
 
