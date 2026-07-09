@@ -47,32 +47,35 @@ if [ -n "$branch" ]; then
   fi
 fi
 
-# context usage — parse the live transcript (matches /context). cheap: grep|tail -1
-# grabs the last main-chain assistant message, so no whole-file jq slurp.
-tp=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
-if [ -n "$tp" ] && [ -f "$tp" ]; then
-  last_usage=$(grep '"usage"' "$tp" 2>/dev/null | grep -v '"isSidechain":true' | tail -1)
-  used=$(printf '%s' "$last_usage" | jq -r '(.message.usage // {}) | ((.input_tokens//0)+(.cache_read_input_tokens//0)+(.cache_creation_input_tokens//0))' 2>/dev/null)
-  if [ -n "$used" ] && [ "$used" -gt 0 ] 2>/dev/null; then
-    case "$(printf '%s' "$input" | jq -r '.model.id // empty' 2>/dev/null)" in
-      *'[1m]'*|*1M*) win=1000000; winlbl="1M" ;;
-      *)            win=200000;  winlbl="200k" ;;
-    esac
-    pct=$(( used * 100 / win ))
-    usedk=$(( (used + 500) / 1000 ))
-    if   [ "$pct" -ge 80 ]; then C_CTX=$'\033[38;5;211m'   # Red
-    elif [ "$pct" -ge 50 ]; then C_CTX=$'\033[38;5;215m'   # Peach
-    else                         C_CTX=$'\033[38;5;114m'   # Green
+# context usage — the payload carries the real window + usage (context_window, CC 2.1+);
+# transcript parse kept only as fallback for older builds (guesses the window from model id).
+win=$(printf '%s' "$input" | jq -r '.context_window.context_window_size // empty' 2>/dev/null)
+pct=$(printf '%s' "$input" | jq -r '.context_window.used_percentage // empty' 2>/dev/null)
+if [ -z "$pct" ]; then
+  tp=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
+  if [ -n "$tp" ] && [ -f "$tp" ]; then
+    last_usage=$(grep '"usage"' "$tp" 2>/dev/null | grep -v '"isSidechain":true' | tail -1)
+    used=$(printf '%s' "$last_usage" | jq -r '(.message.usage // {}) | ((.input_tokens//0)+(.cache_read_input_tokens//0)+(.cache_creation_input_tokens//0))' 2>/dev/null)
+    if [ -n "$used" ] && [ "$used" -gt 0 ] 2>/dev/null; then
+      case "$(printf '%s' "$input" | jq -r '.model.id // empty' 2>/dev/null)" in
+        *'[1m]'*|*1M*) win=1000000 ;;
+        *)             win=200000 ;;
+      esac
+      pct=$(( used * 100 / win ))
     fi
-    segs+=("${C_CTX}${pct}%${R}")
   fi
+fi
+if [ -n "$pct" ] && [ "$pct" -ge 0 ] 2>/dev/null; then
+  if   [ "$pct" -ge 80 ]; then C_CTX=$'\033[38;5;211m'   # Red
+  elif [ "$pct" -ge 50 ]; then C_CTX=$'\033[38;5;215m'   # Peach
+  else                         C_CTX=$'\033[38;5;114m'   # Green
+  fi
+  segs+=("${C_CTX}${pct}%${R}")
 fi
 
 if [ -n "$model" ]; then
   mname=${model%% (*}
-  case "$(printf '%s' "$input" | jq -r '.model.id // empty' 2>/dev/null)" in
-    *'[1m]'*|*1M*) mname="${mname} ${C_1M}1M${R}${C_MOD}" ;;
-  esac
+  [ "${win:-0}" -ge 1000000 ] 2>/dev/null && mname="${mname} ${C_1M}1M${R}${C_MOD}"
   segs+=("${C_MOD}${mname}${R}")
 fi
 
