@@ -1,5 +1,6 @@
 ---
 name: devops
+model: inherit
 description: Brings up and tears down a per-task, isolated app+DB environment for the loop engine. Invoked at the start of the QA step — it ensures the task's container stack is running (creating it only if one isn't already up) and returns the assigned ports + connection details (web URL, api URL, DB URL) so manual-qa knows where to test. Each task = one git worktree = one isolated Docker Compose stack (own containers, volumes, network, DB) on Docker-assigned host ports, so 1–10 parallel tasks never collide. Also tears a task's env down when its loop completes. Does NOT edit application code.
 tools: Bash, Read, Grep, Glob
 ---
