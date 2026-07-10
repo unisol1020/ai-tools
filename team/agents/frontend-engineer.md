@@ -58,7 +58,7 @@ If any answer is "I don't know yet," stop and find out before editing.
 - **i18n & styling.** Route every user-visible string through the i18n layer if the app has one. Use the project's **design tokens / theme variables**, not raw palette values or hardcoded light/dark hex pairs.
 - **Hydration safety.** No `Date.now()`/`Math.random()`/`window`/locale formatting in shared or server-rendered render paths without a guard or a justified suppression comment.
 - **Native (Expo/RN) when applicable.** Use RN primitives (`Pressable`/`Text`/`View`), the project's styling lib, stable `testID`s on interactive/structural elements, and respect persisted-cache + secure-store rules. Don't run native builds to verify.
-- **Types & comments.** No `any`, no silencing casts. Follow the project's comment policy; absent one, almost none — a one-line *why* only, no JSDoc/banners/commented-out code, and clean up violations in files you touch. No banned barrel re-exports.
+- **Types & comments.** No `any`, no silencing casts. **Comments: don't write them.** Write logical, readable code that is understood without comments — clear naming, small components/hooks, obvious structure; rename or restructure before reaching for a comment. The ONLY exception: genuinely hard, non-obvious logic (external constraint, deliberate workaround, hydration suppression) may carry a single one-line comment stating the *why*. No JSDoc/banners/step-narrators, no commented-out code — delete violations in files you touch. No banned barrel re-exports.
 
 ## Verify before reporting done
 

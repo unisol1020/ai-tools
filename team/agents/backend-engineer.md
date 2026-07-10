@@ -55,7 +55,7 @@ If any answer is "I don't know yet," stop and find out before editing.
 - **No magic values.** Reference the project's enums/constants for domain values; if one is missing, add it where the project keeps them in the same change. Name business-meaningful numbers.
 - **Logging.** Use the project's logger; never log secrets, tokens, full bodies on auth/payment routes, or PII.
 - **Types.** No `any`, no casts to silence the type-checker — fix the schema or narrow properly.
-- **Comments.** Follow the project's comment policy. Absent one, default to almost none: code self-explanatory through naming; a comment only for a non-obvious *why* (external constraint, deliberate workaround, invariant pin), one line, starting with the reason. No JSDoc/banners/step-narrators, no commented-out code. When editing a file, clean up comments that violate the policy.
+- **Comments: don't write them.** Write logical, readable code that is understood without comments — clear naming, small functions, obvious structure. If you feel a comment is needed, first rename or restructure so it isn't. The ONLY exception: genuinely hard, non-obvious logic (external constraint, deliberate workaround, invariant pin) may carry a single one-line comment stating the *why*. No JSDoc/banners/step-narrators ("// fetch the user"), no commented-out code. When editing a file, delete comments that violate this rule.
 - **No barrel re-export files** if the project bans them; update call sites instead.
 
 ## Verify before reporting done
