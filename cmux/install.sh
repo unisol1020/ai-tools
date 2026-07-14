@@ -6,13 +6,15 @@
 # Flags:
 #   --with-deps   brew-install missing deps (Cursor, JetBrains Mono Nerd Font, jq)
 #   --with-db     brew-install the recommended terminal SQL client (harlequin)
-#   --bypass      ALSO set Claude Code permissions.defaultMode=bypassPermissions (see WARNING)
+# WARNING: the merged settings include permissions.defaultMode=bypassPermissions
+# (auto-approves ALL tool calls). Delete those keys from the snippet to opt out.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WITH_DEPS=0; WITH_DB=0; BYPASS=0
+WITH_DEPS=0; WITH_DB=0
 for a in "$@"; do case "$a" in
-  --with-deps) WITH_DEPS=1 ;; --with-db) WITH_DB=1 ;; --bypass) BYPASS=1 ;;
+  --with-deps) WITH_DEPS=1 ;; --with-db) WITH_DB=1 ;;
+  --bypass) echo "note: --bypass is obsolete — bypassPermissions now ships in the settings snippet" ;;
   *) echo "unknown flag: $a" >&2; exit 2 ;;
 esac; done
 
@@ -53,7 +55,8 @@ if command -v jq >/dev/null 2>&1; then
   else
     printf '%s\n' "$snip" > "$HOME/.claude/settings.json"
   fi
-  echo "  merged statusLine/theme/tui/effort/model/ultracode into ~/.claude/settings.json"
+  echo "  merged statusLine/theme/tui/effort/model/ultracode/bypassPermissions into ~/.claude/settings.json"
+  echo "  ⚠ permissions.defaultMode=bypassPermissions is ON (auto-approves ALL tool calls)"
 else
   echo "  WARN: jq not found — skipped settings merge. Set statusLine manually (see README)."
 fi
@@ -72,14 +75,6 @@ if [ "$WITH_DEPS" = 1 ]; then
 fi
 if [ "$WITH_DB" = 1 ]; then
   brew_has && { command -v harlequin >/dev/null 2>&1 || brew install harlequin; } || echo "  WARN: Homebrew not found; install harlequin manually."
-fi
-
-# 8. bypassPermissions — opt-in only (security-sensitive)
-if [ "$BYPASS" = 1 ]; then
-  jq '.permissions = (.permissions // {}) | .permissions.defaultMode = "bypassPermissions"' \
-    "$HOME/.claude/settings.json" > "$HOME/.claude/settings.json.tmp" \
-    && mv "$HOME/.claude/settings.json.tmp" "$HOME/.claude/settings.json"
-  echo "  ⚠ ENABLED permissions.defaultMode=bypassPermissions (auto-approves ALL tool calls)."
 fi
 
 # 9. Reload cmux (covers cmux.json + Ghostty config; no app restart)
@@ -101,7 +96,9 @@ Done. Notes:
   • The [PONYTAIL] badge is a static label the statusline always shows. The ponytail
     plugin (lazy-senior-dev mode) installs separately: /plugin in Claude Code, add
     marketplace DietrichGebert/ponytail, enable it.
-  • The "bypass permissions on" mode was NOT enabled unless you passed --bypass.
+  • ⚠ "bypass permissions on" IS enabled (ships in the settings snippet) — every tool
+    call is auto-approved. Opt out: delete the permissions key from ~/.claude/settings.json
+    or cycle modes with Shift+Tab in Claude Code.
   • Open a DB anywhere:  db-tui 'postgres://user:pass@host/db'   (right-side cmux split)
   • Revert anything from the timestamped .bak files next to each target.
 DONE

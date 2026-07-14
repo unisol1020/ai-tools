@@ -53,7 +53,7 @@ Walkthrough: cmux reads `cmux.json` for its own behavior (and `ghostty/config` f
 > 4. **Offer the optional flags — ASK the user first, don't assume:**
 >    - `--with-deps` → brew-installs Cursor (`--cask cursor`), the JetBrains Mono Nerd Font, and `jq`. Ask before running brew.
 >    - `--with-db` → brew-installs `harlequin` (the recommended terminal SQL client).
->    - `--bypass` → **SECURITY: also turns on `bypassPermissions`, which auto-approves *every* tool call with no prompt.** Only add this if the user explicitly asks for it; explain the risk first. The screenshot's "bypass permissions on" comes from this — it is OFF by default.
+> 4b. **WARN the user before running:** the merged settings turn ON `permissions.defaultMode=bypassPermissions` — **every tool call is auto-approved with no prompt** (the screenshot's "bypass permissions on"). If they don't want that, delete the `permissions` and `skipDangerousModePermissionPrompt` keys from `config/claude-settings.snippet.json` before installing, or cycle modes later with **Shift+Tab**.
 > 5. **Report back:** confirm what was written, list any `✗` dependencies the installer printed with their `brew` commands, and tell the user to **restart Claude Code once**. Mention the ponytail plugin (lazy-senior-dev mode) installs separately (step in the README); the `[PONYTAIL]` statusline badge shows regardless.
 >
 > Update later with `git -C ~/.claude-tools pull` then re-run `install.sh`. Uninstall: restore the `.bak-*` files (see bottom).
@@ -156,17 +156,17 @@ The installer deep-merges these keys (your other settings are preserved):
 | `theme` | `dark` | Claude Code UI theme |
 | `tui` | `fullscreen` | full-screen TUI |
 | `effortLevel` | `xhigh` | reasoning effort |
-| `model` | `opus[1m]` | Opus with the 1M-context window |
+| `model` | `claude-fable-5[1m]` | Fable 5 with the 1M-context window |
 | `autoCompactEnabled` | `true` | auto-compact long sessions |
+| `ultracode` | `true` | multi-agent Workflow orchestration on substantive tasks |
+| `skipDangerousModePermissionPrompt` | `true` | no confirmation when starting in bypass mode |
+| `permissions.defaultMode` | `bypassPermissions` | ⚠️ auto-approves **every** tool call (see below) |
 
-**Two things the installer does NOT do automatically:**
+**⚠️ `bypassPermissions` ships ON by default** — the "**bypass permissions on**" line in the screenshot. Claude can edit files, run any shell command, and call any tool without asking. That is a real risk; keep it only if you understand it and trust your workflow. To opt out, delete the `permissions` and `skipDangerousModePermissionPrompt` keys from `config/claude-settings.snippet.json` before installing (or from `~/.claude/settings.json` after). Toggle it live anytime in Claude Code with **Shift+Tab** (cycles permission modes).
+
+**One thing the installer does NOT do automatically:**
 
 - **ponytail (lazy-senior-dev mode)** — install the plugin: `/plugin` → add marketplace `DietrichGebert/ponytail` → enable `ponytail`. Restart. (The `[PONYTAIL]` statusline badge shows regardless.)
-- **⚠️ `permissions.defaultMode: bypassPermissions`** — the "**bypass permissions on**" line in the screenshot. It **auto-approves every tool call with no prompt** — Claude can edit files, run any shell command, and call any tool without asking. That is a real risk; only enable it if you understand it and trust your workflow. It is **off unless you pass `--bypass`**, or set it yourself:
-  ```bash
-  bash ~/.claude-tools/cmux/install.sh --bypass   # opt-in, your call
-  ```
-  Toggle it live anytime in Claude Code with **Shift+Tab** (cycles permission modes).
 
 ---
 

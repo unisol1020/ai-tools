@@ -1,5 +1,5 @@
 {
-  "//": "The visual/functional Claude Code settings from this setup. install.sh MERGES these keys into ~/.claude/settings.json (it does NOT overwrite the file). __HOME__ is replaced with your home dir. NOTE: permissions.defaultMode is intentionally NOT here — bypassPermissions auto-approves every tool call and is opt-in only (see README + install.sh --bypass).",
+  "//": "The visual/functional Claude Code settings from this setup. install.sh MERGES these keys into ~/.claude/settings.json (it does NOT overwrite the file). __HOME__ is replaced with your home dir. WARNING: permissions.defaultMode=bypassPermissions auto-approves EVERY tool call with no prompt — delete the permissions + skipDangerousModePermissionPrompt keys before installing if you don't want that.",
 
   "statusLine": { "type": "command", "command": "bash __HOME__/.claude/statusline.sh" },
   "theme": "dark",
@@ -7,5 +7,7 @@
   "effortLevel": "xhigh",
   "model": "claude-fable-5[1m]",
   "autoCompactEnabled": true,
-  "ultracode": true
+  "ultracode": true,
+  "skipDangerousModePermissionPrompt": true,
+  "permissions": { "defaultMode": "bypassPermissions" }
 }
