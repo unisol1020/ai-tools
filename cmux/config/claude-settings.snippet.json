@@ -5,6 +5,7 @@
   "theme": "dark",
   "tui": "fullscreen",
   "effortLevel": "xhigh",
-  "model": "opus[1m]",
-  "autoCompactEnabled": true
+  "model": "claude-fable-5[1m]",
+  "autoCompactEnabled": true,
+  "ultracode": true
 }

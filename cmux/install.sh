@@ -53,7 +53,7 @@ if command -v jq >/dev/null 2>&1; then
   else
     printf '%s\n' "$snip" > "$HOME/.claude/settings.json"
   fi
-  echo "  merged statusLine/theme/tui/effort/model into ~/.claude/settings.json"
+  echo "  merged statusLine/theme/tui/effort/model/ultracode into ~/.claude/settings.json"
 else
   echo "  WARN: jq not found — skipped settings merge. Set statusLine manually (see README)."
 fi
