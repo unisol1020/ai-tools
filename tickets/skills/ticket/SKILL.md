@@ -60,6 +60,7 @@ Tracker tool names are **detected live each session** (MCP names change) — nev
    - **Reproduction** (bug) or **how to test** (feature) — concrete, numbered steps with the expected result, from what was actually discussed. Write them so QA can follow without guessing.
    - **Design / references** — every `figma.com` link, Claude/v0/preview design URL, and screenshot or image path shared in the conversation.
    - **Test results** — the most recent qa-run / manual-qa verdict, `npm test`/`pytest`/CI output, or repro logs. These go in a **comment**, not the body (step 8).
+   - **The flow** — when the ticket involves multi-step or multi-component logic (a request path, state machine, async chain, permission cascade), note the actual path (user action → component → endpoint → data) so you can diagram it in the draft.
    - One request may be several tickets ("create tickets for X, Y, Z") → draft one ticket **per distinct problem**. Don't cram unrelated things into one.
 
 5. **Enrich from any connected MCP** that adds real signal. Check what's connected (`claude mcp list` + this session's deferred-tool list) and pull context for *this* ticket only — never invent, never dump a dashboard:
@@ -86,7 +87,7 @@ Tracker tool names are **detected live each session** (MCP names change) — nev
 Write it the way a good engineer files a ticket for the teammate who picks it up next — often a **tester / QA**, not just the implementer. **Pick Bug or Feature by the request.** A feature ticket isn't a dev spec: a tester reading it must come away knowing **what it does / what problem it solves, where to find it, the design, and exactly how to test it**. Include only the sections that have real content — delete the rest. Markdown.
 
 **Bug**
-```markdown
+````markdown
 **What's happening**
 <1–2 plain sentences: the observed broken behavior.>
 
@@ -99,6 +100,14 @@ Write it the way a good engineer files a ticket for the teammate who picks it up
 - Expected: …
 - Actual: …
 
+**How it flows**            ← only for multi-step / multi-component logic
+```mermaid
+flowchart LR
+  User -->|clicks Pay| Checkout --> API["POST /orders"] --> DB[(orders)]
+  API -. breaks here .-> X[total ignores discount]
+```
+<one line: what the diagram shows and where it breaks.>
+
 **Likely cause**            ← only if you actually have a lead
 <one line — the suspected root cause.>
 
@@ -109,15 +118,22 @@ Write it the way a good engineer files a ticket for the teammate who picks it up
 **How to verify the fix**
 - [ ] <observable outcome, not an implementation step>
 - [ ] …
-```
+````
 
 **Feature / task** — written so a tester can pick it up and verify it
-```markdown
+````markdown
 **What & why**
 <1–2 plain sentences: the functionality added and the problem it solves / what the user can now do. The point, not a feature list.>
 
 **Where to find it**
 <how a tester reaches it: the page / screen / flow + entry point, plus any flag, role, or test data needed to see it.>
+
+**How it flows**            ← only for multi-step / multi-component logic
+```mermaid
+flowchart LR
+  User -->|uploads CSV| ImportPage --> API["POST /imports"] --> Queue --> Worker --> DB[(rows)]
+```
+<one line: what the diagram shows — the happy path a tester walks.>
 
 **Design**                  ← only if links/screenshots exist
 - Figma: <link>             (frame rendered + attached if a Figma MCP is connected)
@@ -134,7 +150,7 @@ Write it the way a good engineer files a ticket for the teammate who picks it up
 
 **Out of scope**            ← only if worth calling out
 - <what this does not cover yet>
-```
+````
 
 ## Rules — what keeps it human, not AI slop
 
@@ -144,6 +160,7 @@ Write it the way a good engineer files a ticket for the teammate who picks it up
 - **Be specific.** Real file paths, real symbols, real URLs, real numbers — never "the relevant component" or "various places".
 - **Short beats complete-looking.** A small bug is a few lines. Don't manufacture sections or nested bullet trees to look thorough. Omit empty sections entirely.
 - **One problem per ticket.** Split a multi-part request into multiple tickets.
+- **Diagram complex flow; skip trivial ones.** When the logic spans multiple components or steps (request path, state machine, async chain, permission cascade), add ONE small Mermaid diagram (`flowchart` or `sequenceDiagram`, ~5–10 nodes) in the **How it flows** section so a human grasps the flow at a glance — label the arrows with what actually happens ("clicks Pay", "retries 3×"), and in a bug mark where it breaks. Linear renders Mermaid natively; in Jira it shows as a code block, which is still readable — keep it small enough to read as text. A one-screen bug or single-component change gets **no diagram** — a forced diagram is its own kind of slop.
 - **Always testable.** Every ticket — bug or feature — ends with steps a tester can follow and observable outcomes to confirm, never a re-listing of the implementation steps. A feature without "where to find it" + "how to test" is unfinished.
 - **Evidence lives in a comment.** Full logs, stack traces, complete test output → step 8's comment, so the description stays scannable.
 - **Confirm before creating** (unless told not to). Surface the draft; the user's quick edit is the last guard against slop.
