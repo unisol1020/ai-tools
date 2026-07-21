@@ -30,6 +30,19 @@ else
   echo "  WARN: 'claude' CLI not found on PATH — add the MCP manually after installing Claude Code."
 fi
 
+if [ "$(uname)" = "Darwin" ] && xcode-select -p >/dev/null 2>&1 && command -v claude >/dev/null 2>&1; then
+  echo "Registering Xcode MCP (user scope) for native iOS QA ..."
+  if claude mcp get xcode >/dev/null 2>&1; then
+    echo "  xcode MCP already registered — skipping"
+  else
+    claude mcp add -s user --transport stdio xcode -- xcrun mcpbridge \
+      && echo "  added xcode MCP (xcrun mcpbridge)" \
+      || echo "  WARN: could not add xcode MCP — add manually: claude mcp add -s user --transport stdio xcode -- xcrun mcpbridge"
+  fi
+  echo "  ONE-TIME in Xcode: Settings > Intelligence > enable 'Allow external agents to use Xcode tools'."
+  echo "  The bridge needs Xcode RUNNING with your project open when native QA runs."
+fi
+
 cat <<'DONE'
 
 Done. Next:
@@ -41,4 +54,10 @@ Done. Next:
 
 Requirements: Node.js (for npx) and Claude Code. cmux (optional, macOS) is only used for
 visual/design checks; functional QA needs only the Playwright MCP.
+
+Native iOS QA (optional, macOS + Xcode 26+): the installer registered the Xcode MCP
+(xcrun mcpbridge). Enable Xcode > Settings > Intelligence > "Allow external agents to use
+Xcode tools" once, keep Xcode open with your project when testing, and grant your terminal
+Accessibility permission (System Settings > Privacy & Security) so the agent can tap the
+Simulator. Then ask: "test the native app" / "check it in the simulator".
 DONE
