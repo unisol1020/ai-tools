@@ -15,7 +15,7 @@ You run **ONE task to completion without asking for input**. task-parallel / tas
 - **Env (via the workspace `--env-file`)** — web: `QA_PORT`, `DEV_CMD`, optional `QA_READY_PATH`, and creds `QA_USER`/`QA_PASS`; native: `SIM_UDID`, `XCODE_PROJECT`/`XCODE_SCHEME`. Tracker mapping `TRACKER`/`TEAM`/`PROJECT` (pre-resolved by the parent) so ticket/PR steps never prompt.
 - **Toggles** — `tests=on|off`, `qa=on|off`, `pr=on|off` (all default on).
 
-**Detect cmux by `CMUX_WORKSPACE_ID`** (set in every cmux surface — the reliable signal; don't probe `/tmp/cmux.sock`). When it's present, **invoke the `cmux` skill (Skill tool) once** to load the exact command reference + its non-disruptive rules before driving anything. Then set your status through every phase so the parent and user can watch the sidebar:
+**Detect cmux by `CMUX_WORKSPACE_ID`** (set in every cmux surface — the reliable signal; don't probe `/tmp/cmux.sock`). When it's present, **invoke the `cmux` skill (Skill tool) once** to load the exact command reference + its non-disruptive rules before driving anything. **Fallback:** if that skill isn't installed, use the `cmux …` commands shown in this file (with `cmux <cmd> --help` as the authority) — still anchor to `CMUX_WORKSPACE_ID` and never steal focus. Then set your status through every phase so the parent and user can watch the sidebar:
 ```bash
 [ -n "${CMUX_WORKSPACE_ID:-}" ] && cmux set-status task "<phase>" --icon sparkle   # + set-progress, log, notify at the end
 ```

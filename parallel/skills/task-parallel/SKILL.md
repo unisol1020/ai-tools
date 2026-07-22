@@ -18,7 +18,7 @@ These gates would hang an unattended runner, so **resolve them up front** (AskUs
 - **Resource key per target** — build the QA-lock key from the *physical* target so every task sharing it serializes and distinct targets run concurrently: web → **`web-<qa-port>`**, native → **`sim-<udid>`**. You assign it; the runner uses it verbatim.
 
 ## Step 3 — Fan out (one worktree + one visible cmux surface per task)
-**First, load the cmux driver.** Invoke the **`cmux` skill (Skill tool)** so you have its exact commands (`new-workspace`, `send`, `set-status`, `sidebar-state`, `notify`) and — critically — its **non-disruptive-automation rules**: anchor to `CMUX_WORKSPACE_ID`, always `--focus false`, build layout additively, and only ever send input to a surface you spawned. Everything below assumes those rules.
+**First, load the cmux driver.** Invoke the **`cmux` skill (Skill tool)** so you have its exact commands (`new-workspace`, `send`, `set-status`, `sidebar-state`, `notify`) and — critically — its **non-disruptive-automation rules**: anchor to `CMUX_WORKSPACE_ID`, always `--focus false`, build layout additively, and only ever send input to a surface you spawned. **Fallback:** if that skill isn't installed in this session, use the `cmux …` commands documented in this skill, with `cmux <cmd> --help` / `cmux --help` as the authority — the same rules above still apply. Everything below assumes them.
 
 Then, per task: worktree off `base`, write its brief + env **outside the repo** (so they can't be committed), and launch a runner. Keep the `--command` **short and single-line** (no long/quoted text on the command line — that breaks the shell); pass the description/constraints as a file and secrets/config as an env-file.
 ```bash
