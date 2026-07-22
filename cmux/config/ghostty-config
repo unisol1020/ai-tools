@@ -5,9 +5,9 @@
 theme = light:Catppuccin Latte,dark:Catppuccin Mocha
 
 # Transparency + blur (the modern glass look)
-background-opacity = 0.92
-background-blur = 20
-unfocused-split-opacity = 0.85
+background-opacity = 0.83
+background-blur = 11
+unfocused-split-opacity = 0.77
 
 # Font
 font-family = "JetBrainsMono Nerd Font"
