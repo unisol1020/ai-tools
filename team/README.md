@@ -42,7 +42,7 @@ You don't run anything. Paste this file (or its URL) into **Claude Code** and sa
 > 4. **Verify:** `ls -la ~/.claude/agents/` shows `architect`, `backend-engineer`, `frontend-engineer`, `automation-qa`, `backend-reviewer`, `frontend-reviewer`, `security-reviewer` as symlinks into `~/.claude-tools/team`.
 > 5. **Report back to the user** — confirm it's installed, tell them to **restart Claude Code once** so the agents load, then note two things:
 >    - The crew works on its own, but pairs with the rest of claude-tools: install `qa/` (adds `manual-qa` + the browser tools) and `loop/` (adds `devops` + the autonomous engine) to complete the plan→build→test→review→PR chain.
->    - **For the architect's "grill" step:** if a **`grill-me`** skill is in the session's skill list, the architect's Phase 1 is REQUIRED to route through it — the architect hands its open points back to the parent and the parent runs grill-me against the user. Only when no grill-me exists does the architect build the question list itself. To enable it, drop a grill-me skill into `~/.claude/skills/` and restart.
+>    - **For the architect's "grill" step:** if a **`grill-me`** skill is in the session's skill list, the architect's Phase 1 is REQUIRED to route through it — the architect hands its open points back to the parent and the parent runs grill-me against the user. Only when no grill-me exists does the architect build the question list itself. Install the recommended one (Matt Pocock's — see [The grill-me skill](#the-grill-me-skill-for-the-architect) below), then restart.
 
 ### Manual install (if you'd rather)
 
@@ -54,7 +54,18 @@ Then restart Claude Code.
 
 ## The grill-me skill (for the architect)
 
-The architect's Phase 1 is a **grill step** — it interrogates you (through the main thread) until the task's goal, flows, edge cases, and definition of done are unambiguous. If a **`grill-me`** skill or plugin is present in the skill list, the architect MUST use it: it stops, hands its gathered context and open points back to the parent, and instructs the parent to invoke grill-me to run the questioning, sending the answers back before the design phase starts. It never substitutes its own ad-hoc questions while grill-me is available. Only when the skill is absent does the architect build the question list itself. To enable it, put a `grill-me` skill under `~/.claude/skills/` (or install it as a plugin) and restart Claude Code.
+The architect's Phase 1 is a **grill step** — it interrogates you (through the main thread) until the task's goal, flows, edge cases, and definition of done are unambiguous. If a **`grill-me`** skill or plugin is present in the skill list, the architect MUST use it: it stops, hands its gathered context and open points back to the parent, and instructs the parent to invoke grill-me to run the questioning, sending the answers back before the design phase starts. It never substitutes its own ad-hoc questions while grill-me is available. Only when the skill is absent does the architect build the question list itself.
+
+**Recommended: [`grill-me`](https://github.com/mattpocock/skills) by [Matt Pocock](https://github.com/mattpocock).** It's the best grill skill out there — a relentless, one-question-at-a-time interview (it runs a `/grilling` session) that resolves every branch of a decision, recommending an answer for each, until you both genuinely agree on the plan. Exactly what the architect's grill step wants. Huge thanks to Matt for open-sourcing it (MIT). 🙏
+
+It is **not vendored into this repo** — install it locally so it stays yours to update. The plug-and-play route (installs Matt's set as a managed, always-current bundle):
+
+```bash
+claude plugin marketplace add mattpocock/skills
+claude plugin install mattpocock-skills@mattpocock
+```
+
+Or, to keep just `grill-me` (+ its `grilling` engine), copy those two skills into `~/.claude/skills/` from the repo above. Either way, restart Claude Code and the architect will start routing its Phase-1 questioning through it.
 
 ## Requirements
 

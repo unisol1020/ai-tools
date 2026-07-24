@@ -31,10 +31,15 @@ Done. Next:
        "write tests for this"              → automation-qa
        reviews run after changes           → backend-reviewer / frontend-reviewer / security-reviewer
 
-Optional but recommended for the architect's Phase 1 "grill" (interrogation) step:
-  a **grill-me** skill in your skill list. If present, the architect invokes it to run the
-  questioning; if absent, it builds the question list itself — so this is a nice-to-have, not
-  a requirement. Install one by dropping a grill-me skill into ~/.claude/skills, then restart.
+Recommended for the architect's Phase 1 "grill" (interrogation) step — the **grill-me** skill
+by Matt Pocock. It's the best grill skill out there: a relentless, one-question-at-a-time
+interview that pins a plan down before any code is written. Thank you, Matt! 🙏 (MIT)
+  https://github.com/mattpocock/skills
+It's NOT bundled here — install it locally once, then restart:
+  claude plugin marketplace add mattpocock/skills
+  claude plugin install mattpocock-skills@mattpocock
+If present, the architect routes its Phase-1 questioning through it; if absent, it builds the
+question list itself. grill-me runs a /grilling session, so both skills come with it.
 
 Pairs with the rest of claude-tools: the loop/ engine and the architect's babysit protocol
 dispatch exactly these agents (plan → implement → test → review), and qa/ adds manual-qa.
