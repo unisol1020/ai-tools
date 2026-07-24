@@ -34,13 +34,20 @@ if [ -n "$branch" ]; then
   fi
 
   files=$(git status --porcelain 2>/dev/null | grep -c .)
-  shortstat=$(git diff --shortstat 2>/dev/null)
-  adds=$(printf '%s' "$shortstat" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+')
+  # tracked changes vs HEAD (covers staged + unstaged); empty on a repo with no commits
+  shortstat=$(git diff HEAD --shortstat 2>/dev/null)
+  tadds=$(printf '%s' "$shortstat" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+')
   dels=$(printf '%s' "$shortstat" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+')
-  if [ "${files:-0}" -gt 0 ] 2>/dev/null || [ -n "$adds" ] || [ -n "$dels" ]; then
+  # NEW/untracked files: git diff never counts them, so add their inserted lines.
+  # numstat vs /dev/null matches git's own counting and reports binaries as "-" (skipped).
+  uadds=$(git ls-files --others --exclude-standard 2>/dev/null | head -n 500 | while IFS= read -r f; do
+            git diff --numstat --no-index -- /dev/null "$f" 2>/dev/null
+          done | awk '$1 ~ /^[0-9]+$/ {s+=$1} END{print s+0}')
+  adds=$(( ${tadds:-0} + ${uadds:-0} )); dels=${dels:-0}
+  if [ "${files:-0}" -gt 0 ] 2>/dev/null || [ "$adds" -gt 0 ] || [ "$dels" -gt 0 ]; then
     chg="${C_FILE}±${files}${R}"
-    [ -n "$adds" ] && chg="${chg} ${C_ADD}+${adds}${R}"
-    [ -n "$dels" ] && chg="${chg} ${C_DEL}-${dels}${R}"
+    [ "$adds" -gt 0 ] && chg="${chg} ${C_ADD}+${adds}${R}"
+    [ "$dels" -gt 0 ] && chg="${chg} ${C_DEL}-${dels}${R}"
     segs+=("$chg")
   else
     segs+=("${C_CLEAN}✓ clean${R}")
