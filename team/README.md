@@ -67,6 +67,22 @@ claude plugin install mattpocock-skills@mattpocock
 
 Or, to keep just `grill-me` (+ its `grilling` engine), copy those two skills into `~/.claude/skills/` from the repo above. Either way, restart Claude Code and the architect will start routing its Phase-1 questioning through it.
 
+### Let the architect call it automatically (recommended tweak)
+
+Matt ships `grill-me` as **user-only** — its frontmatter has `disable-model-invocation: true`, so out of the box it only fires when **you** type `/grill-me`. For the architect → parent hand-back to trigger it *on its own* (no typing), make it model-invocable: open `~/.claude/skills/grill-me/SKILL.md` and **delete the `disable-model-invocation: true` line**. One line:
+
+```diff
+  ---
+  name: grill-me
+  description: A relentless interview to sharpen a plan or design.
+- disable-model-invocation: true
+  ---
+
+  Run a `/grilling` session.
+```
+
+(Optional: widen the `description` to name the triggers — e.g. *"…Use when the user wants to stress-test a plan, uses any 'grill' phrase, or when a subagent like the architect hands back open questions."* The model reads the description to decide when to auto-invoke, so a fuller one makes it fire more reliably.) The `grilling` engine it calls is already model-invocable, so this only affects the `grill-me` alias. Restart Claude Code — now both the model and `/grill-me` can run it.
+
 ## Requirements
 
 - [Claude Code](https://claude.com/claude-code) and `git`.
