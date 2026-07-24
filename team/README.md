@@ -83,6 +83,23 @@ Matt ships `grill-me` as **user-only** — its frontmatter has `disable-model-in
 
 (Optional: widen the `description` to name the triggers — e.g. *"…Use when the user wants to stress-test a plan, uses any 'grill' phrase, or when a subagent like the architect hands back open questions."* The model reads the description to decide when to auto-invoke, so a fuller one makes it fire more reliably.) The `grilling` engine it calls is already model-invocable, so this only affects the `grill-me` alias. Restart Claude Code — now both the model and `/grill-me` can run it.
 
+### Force the main thread to grill, not poll
+
+The architect halts and demands grill-me the moment it has open questions — but that only fires **once the architect is invoked**. The common miss is the **main thread** gathering requirements itself (its own `AskUserQuestion` polls) before it ever delegates to the architect, so grill-me never gets a turn. Close that gap with a rule in your **global** `~/.claude/CLAUDE.md`:
+
+```markdown
+## Grill, don't poll (requirements for any plan / feature / non-trivial change)
+
+Whenever you gather requirements before planning or building something non-trivial — in the
+main thread OR when the architect hands back open questions — you MUST interrogate the user via
+the `grill-me` skill (engine: the model-invocable `grilling` skill), NOT AskUserQuestion polls
+and NOT your own question list. Grilling is one adaptive question at a time; a poll is not
+grilling. If the architect returns a "run grill-me" instruction, invoke grill-me/grilling and
+SendMessage the answers back before it designs. Fall back to AskUserQuestion ONLY after you look
+and confirm no grill-me/grilling skill is installed. AskUserQuestion is still fine for a quick
+one-off choice mid-task that isn't requirements-gathering.
+```
+
 ## Requirements
 
 - [Claude Code](https://claude.com/claude-code) and `git`.
