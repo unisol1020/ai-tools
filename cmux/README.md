@@ -156,7 +156,7 @@ The installer deep-merges these keys (your other settings are preserved):
 | `theme` | `dark` | Claude Code UI theme |
 | `tui` | `fullscreen` | full-screen TUI |
 | `effortLevel` | `xhigh` | reasoning effort |
-| `model` | `claude-fable-5[1m]` | Fable 5 with the 1M-context window |
+| `model` | `claude-opus-5[1m]` | Opus 5 with the 1M-context window |
 | `autoCompactEnabled` | `true` | auto-compact long sessions |
 | `ultracode` | `true` | multi-agent Workflow orchestration on substantive tasks |
 | `skipDangerousModePermissionPrompt` | `true` | no confirmation when starting in bypass mode |
