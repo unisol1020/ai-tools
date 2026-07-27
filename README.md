@@ -36,7 +36,7 @@ flowchart TD
 | Tool | What it does | Install by link |
 |------|--------------|-----------------|
 | [**bootstrap**](bootstrap/README.md) | `/bootstrap` — one command that readies a repo and a fresh machine: installs/verifies the toolchain it expects (ripgrep, CodeGraph + MCP, graphify, ponytail, claude-mem), builds the CodeGraph index, offers `/graphify`, augments `CLAUDE.md`, and records the repo so the session-start nudge stops. Start here when onboarding. | *"install this: https://github.com/unisol1020/claude-tools/blob/main/bootstrap/README.md"* |
-| [**cmux**](cmux/README.md) | A full **cmux + Ghostty + Claude Code** environment, captured 1:1 — glass terminal (Catppuccin, transparent/blurred), file-opens routed into **Cursor** at the git repo root, a colored statusline, merged Claude settings, and a `db-tui` terminal SQL-client launcher. Backs up every file it touches; macOS only. | *"install this: https://github.com/unisol1020/claude-tools/blob/main/cmux/README.md"* |
+| [**cmux**](cmux/README.md) | A full **cmux + Ghostty + Claude Code** environment, captured 1:1 — glass terminal (Catppuccin, transparent/blurred), file-opens routed into **Cursor** at the git repo root, a colored statusline, merged Claude settings, and a `db-tui` terminal SQL-client launcher. Also ships the **`cmux` driver skill**, so Claude can drive workspaces / panes / surfaces / the built-in browser itself — that's what `parallel` uses to lay out its runners. Backs up every file it touches; macOS only. | *"install this: https://github.com/unisol1020/claude-tools/blob/main/cmux/README.md"* |
 | [**qa**](qa/README.md) | A `manual-qa` agent that drives a real browser to check a feature *works* (functional, via Playwright) or *matches the design* (Figma / pixel-perfect). Remembers per-project URL + login + DB, asks once. | *"install this: https://github.com/unisol1020/claude-tools/blob/main/qa/README.md"* |
 | [**tickets**](tickets/README.md) | A `ticket` skill that writes **human-readable** Linear / Jira tickets (not AI slop) — repro + how-to-verify + where the problem lives — pulls Figma/Sentry/Slack context from connected MCPs, and posts test results as a comment. | *"install this: https://github.com/unisol1020/claude-tools/blob/main/tickets/README.md"* |
 | [**morning**](morning/README.md) | A `morning` skill — *"do my morning routine"* / `/morning` — that triages the three things you wake up to into one scannable briefing: open PRs in your repos that aren't yours (reviewed against each project's `CLAUDE.md` + the linked ticket + logic/quality), your assigned Linear/Jira tickets sorted urgency-then-effort and grouped by project, and Slack mentions / DMs / unread. Ships a standalone **`review-prs`** skill too — *"review all PRs"* / *"review this PR: <url>"*. PR comments are held for your OK before anything posts. Reuses qa's reviewer agents, the `ticket` config, and `loop`. | *"install this: https://github.com/unisol1020/claude-tools/blob/main/morning/README.md"* |
@@ -77,6 +77,19 @@ git clone https://github.com/unisol1020/claude-tools.git ~/.claude-tools
 for f in ~/.claude-tools/*/install.sh; do bash "$f"; done
 ```
 Then restart Claude Code.
+
+## cmux CLI facts these skills depend on
+
+Verified against the live CLI, not assumed — each one silently broke a fan-out before it was pinned down. Keep them true if you edit `parallel/` or `cmux/`:
+
+- **`--command` is typed into a plain login shell, not into Claude.** A **CLI-created** workspace does not honour `newWorkspaceCommand: "claude"` from `cmux.json` — that only fires for workspaces created from the UI's global `+`. So a bare `/task-runner …` dies as `no such file or directory` and you get an idle shell that *looks* like a running agent. Launch it yourself: `--command "claude '<prompt>'"`, then confirm with `read-screen` before reporting the task as started.
+- **`cmux --json` ref shape is not uniform.** `new-pane` / `new-surface` return **flat** top-level keys (`.pane_ref`, `.surface_ref`), not `.result.*`. Pipe through `jq .` once before scripting against a command you haven't checked.
+- **`sidebar-state --json` reports only the caller's own workspace.** It cannot enumerate other workspaces, so a status board must come from `list-workspaces` + `read-screen`.
+- **`send --surface` / `list-pane-surfaces`** are the real command names (not `send-surface` / `list-surfaces`).
+- **The CLI cannot close a workspace** — `Cannot close the last surface`, and `workspace-action` only offers close-others/above/below, which would take the user's real ones. So never create throwaway workspaces; the user has to close them by hand.
+- **Short refs are volatile.** Re-resolve `workspace:2` / `surface:7` each time; don't cache them across steps.
+
+**Layout rule for parallel runners:** put them in the **caller's workspace as labeled tabs in one pane**, and `rename-tab` every one. Both alternatives were tried and failed — a separate workspace per task gets buried in a crowded sidebar, and one pane per task is ~15 characters wide and physically unreadable.
 
 ## Adding a new tool to this repo
 
