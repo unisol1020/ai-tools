@@ -64,7 +64,12 @@ fi
 # 6. db-tui launcher on PATH
 ln -sf "$DIR/bin/db-tui.sh" "$HOME/.local/bin/db-tui"; echo "  linked ~/.local/bin/db-tui"
 
-# 7. Optional dep installs
+# 7. cmux driver skill for Claude Code (symlinked, so `git pull` updates it)
+mkdir -p "$HOME/.claude/skills"
+rm -rf "$HOME/.claude/skills/cmux"
+ln -s "$DIR/skills/cmux" "$HOME/.claude/skills/cmux"; echo "  linked ~/.claude/skills/cmux"
+
+# 8. Optional dep installs
 brew_has() { command -v brew >/dev/null 2>&1; }
 if [ "$WITH_DEPS" = 1 ]; then
   brew_has && { echo "Installing deps via brew ..."

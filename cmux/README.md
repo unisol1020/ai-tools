@@ -29,12 +29,13 @@ Walkthrough: cmux reads `cmux.json` for its own behavior (and `ghostty/config` f
 
 | File | Installs to | Role |
 |------|-------------|------|
-| `config/cmux.json` | `~/.config/cmux/cmux.json` | cmux app behavior — editor routing, sidebar, browser link handling, minimal mode, `claude` on new workspace |
+| `config/cmux.json` | `~/.config/cmux/cmux.json` | cmux app behavior — editor routing, sidebar, browser link handling, minimal mode, `claude` on new workspace (UI `+` only — **not** on CLI-created workspaces) |
 | `config/ghostty-config` | `~/.config/ghostty/config` | all terminal visuals — theme, opacity, blur, font, cursor |
 | `config/open-in-micro.sh` | `~/.config/cmux/open-in-micro.sh` | the `preferredEditor` wrapper — routes text/code to Cursor at the git repo root, media to cmux preview |
 | `config/statusline.sh` | `~/.claude/statusline.sh` | the Claude Code statusline (segments + colors) |
 | `config/claude-settings.snippet.json` | merged into `~/.claude/settings.json` | statusLine / theme / tui / effort / model |
 | `bin/db-tui.sh` | `~/.local/bin/db-tui` | open a terminal SQL client in a right-side cmux split |
+| `skills/cmux/` | `~/.claude/skills/cmux` (symlink) | the **cmux driver skill** — lets Claude Code drive workspaces, panes, surfaces, the built-in browser, notifications and sidebar status. `parallel/` uses it to lay out its task runners. |
 
 ## Install — send this README to Claude Code
 
