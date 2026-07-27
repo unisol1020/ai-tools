@@ -44,18 +44,60 @@ TEAM=<team>
 PROJECT=<project>
 EOF
 
-cmux new-workspace --name "TASK-$id" --cwd "$wt" --focus false --env-file "$state/qa.env" \
-  --command "/task-runner brief=$state/BRIEF.md worktree=$wt branch=$id base=<base> resource=<web-PORT|sim-UDID> mode=code tests=on qa=on pr=on"
+# ONE shared runner pane in the CALLER's workspace — create it for the FIRST task only.
+# `cmux --json` returns FLAT keys (pane_ref / surface_ref), NOT nested under .result
+[ -z "${RUNNER_PANE:-}" ] && RUNNER_PANE=$(cmux --json new-pane --workspace "$CMUX_WORKSPACE_ID" \
+  --type terminal --direction right --focus false | jq -r .pane_ref)
+
+# one TAB per task inside that pane
+sref=$(cmux --json new-surface --pane "$RUNNER_PANE" --type terminal \
+  --working-directory "$wt" --focus false | jq -r .surface_ref)
+cmux rename-tab --surface "$sref" "$n · $id"
+
+# per-task env is SOURCED in the command: --env-file is workspace-level and cannot carry
+# N different port/cred sets. And `claude` must be launched explicitly (see below).
+cmux send --surface "$sref" "cd $wt && set -a && . $state/qa.env && set +a && clear && claude '/task-runner brief=$state/BRIEF.md worktree=$wt branch=$branch base=<base> resource=<web-PORT|sim-UDID> mode=code tests=on qa=on pr=on'\n"
 ```
-- The `--command` lands as the new Claude's **first message** (cmux auto-launches `claude` on a new workspace). Keep it to the short pointer above; the runner reads `BRIEF.md` and the env-file for the rest.
+- **`--command` is typed into a plain login shell, NOT into Claude.** A **CLI-created** workspace does **not** honour the `newWorkspaceCommand: "claude"` setting in `cmux.json` — that only fires for workspaces made from the UI's global `+`. Verified: with `newWorkspaceCommand` present in the live config, a `cmux workspace create --command …` probe still landed in `-/bin/zsh`. So a bare `/task-runner …` dies as `zsh: no such file or directory` and you are left with an **idle shell that looks like a running agent**. Launch Claude explicitly and pass the prompt as its argument: `--command "claude '/task-runner …'"`. Keep the prompt to the short pointer above; the runner reads `BRIEF.md` and the env-file for the rest. **Always confirm with `cmux read-screen` that Claude actually booted before reporting a task as started.**
 - `--focus false` so focus isn't stolen; **stagger** launches a second or two apart so `git worktree add` calls don't race.
-- The named `TASK-<id>` workspaces show in the sidebar with each runner's live status/progress — that's the "watch them all" view. To cluster them, add `--group <ref>` (or use `--layout '{…}'` to stack them as panes in one window). One surface per task, no more.
+### Layout — the user MUST be able to read what's running (HARD)
+
+Fanning out is only half the job. If the user can't see the runners, the batch is useless to them.
+Two shapes were tried and **both failed in practice** — do not repeat either:
+
+| ✗ Don't | Why it failed |
+|---|---|
+| One separate top-level workspace per task | They append to the sidebar and get **buried** among the user's existing workspaces (a real session had 20). The user can't find them and can't tell them from their own work. |
+| One pane per task, side by side | 3–4 panes in one row is **~15 characters wide each** — physically unreadable. The user's own chat pane gets crushed too. |
+
+**✓ Do this instead — runners as labeled TABS in ONE pane, in the CALLER's workspace:**
+
+```bash
+# ONE pane in the user's own workspace, first runner creates it
+cmux new-pane --workspace "$CMUX_WORKSPACE_ID" --type terminal --direction right --focus false
+# every other runner becomes a TAB in that same pane
+cmux move-surface --surface <ref> --workspace "$CMUX_WORKSPACE_ID" --pane <that-pane> --focus false
+# ALWAYS name the tabs — three tabs all reading "Claude Code" is unusable
+cmux rename-tab --surface <ref> "1 · <task-id>"
+cmux resize-pane --pane <that-pane> -L --amount 30      # give the runners real width
+```
+
+Rules that follow from this:
+- **Runners live in the caller's workspace**, next to where the user is typing — not in a workspace of their own. That is where they are looking.
+- **One pane, N tabs.** Each runner then gets full width; the user switches with ⌃1–8 or ⌘⇧[ / ⌘⇧]. Never one pane per task.
+- **Always `rename-tab`** to `"<n> · <task-id>"`. Unlabeled tabs are indistinguishable.
+- **Never touch the user's own panes** — not their chat pane, not their dev-server pane.
+- **Verify and tell them the map.** After launching, `cmux tree` and report which tab is which task, plus how to zoom (⌘⇧↵).
+- Cleanup caveat: the CLI **cannot close a workspace** (`Cannot close the last surface`; `workspace-action` only offers close-others/above/below, which would take the user's real ones). So don't create throwaway workspaces you'd need to clean up — the user has to ⌘⇧W them by hand. One more reason to stay in the caller's workspace.
 
 ## Step 4 — Babysit: keep it legible, don't interfere
 You stay in the main thread. You do **not** arbitrate testing (the QA-lock does) — you make the batch legible and step in only when a runner needs a human:
 - **Live board on request / on events**, from what's already there:
   ```bash
-  cmux sidebar-state --json     # each TASK-<id>: phase, progress, needs-input
+  cmux list-workspaces          # find the TASK-* workspace refs (short refs are volatile — re-resolve)
+  cmux read-screen --workspace <ref> --lines 40   # what that runner is actually doing, per task
+  # NOTE: `cmux sidebar-state --json` reports ONLY the caller's own workspace — it cannot
+  # enumerate the task workspaces. Do not build the board from it.
   qa-lock status                # who's testing the shared app/Sim + who's queued
   ```
   Render a tight board: each task → phase (plan/implement/check/tests/qa/PR/done) + the QA lane (🔒 testing: X · ⏳ waiting: Y).
