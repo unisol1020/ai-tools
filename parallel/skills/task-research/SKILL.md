@@ -49,7 +49,7 @@ On confirm, run the **task-parallel** fan-out for the ticked candidates — you'
 - **Code candidate** — worktree off `base`, a `TASK-<id>` surface running `/task-runner … mode=code`. A candidate that **isn't a ticket yet** (a Slack/Sentry-only find): the runner creates it **directly via the tracker MCP** (non-interactive, using the passed mapping) before opening the PR — not the interactive `ticket` skill.
 - **Investigate-only candidate** — a `TASK-<id>` surface running `/task-runner … mode=investigate pr=off qa=off tests=off` (no worktree changes): it investigates and posts findings as a comment on the ticket via the tracker MCP. (This is the runner's investigate mode — don't send investigate-only picks down the code path, which would try to build and open an empty PR.)
 
-Then **babysit + allow add-on-the-fly exactly as task-parallel does** (live board from `cmux sidebar-state` + `qa-lock status`; relay blockers with `cmux send --surface <ref> "…\n"`; report each PR). Don't reimplement any of it — this skill only adds the *discovery* in front.
+Then **babysit + allow add-on-the-fly exactly as task-parallel does** (its Step 4: `qa-lock board` after fan-out and on every user turn, a background `qa-lock board --follow` to be woken on changes, poke a runner that's gone silent while queued, relay blockers with `cmux send --surface <ref> "…\n"`, report each PR). Don't reimplement any of it — this skill only adds the *discovery* in front.
 
 ## Rules
 - **Research before you ask.** The triage reflects the real codebase + the real candidates, not a guess from titles.

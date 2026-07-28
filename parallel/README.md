@@ -63,20 +63,38 @@ Each runner is unattended. It plans **once** with the architect (autonomous — 
 
 The tasks build in parallel, but they **test against the same thing** — your one running dev server, or your one iOS Simulator + Xcode. So testing is serialized by a tiny filesystem lock (`qa-lock`), not by a babysitting parent:
 
-- A runner that's ready to QA calls `qa-lock acquire <task-id> --resource <key> --pid $$`. If it's free, it gets it and tests; if someone's testing, it shows *"⏳ waiting for QA"* and retries every 60s.
+- A runner that's ready to QA calls **`qa-lock wait <task-id> --resource <key> --pid $PPID`** and runs it *in the background*: the command sleeps until the target is free, takes it, and exits — which wakes the runner up. Queued tasks don't poll and don't stall; they get woken in turn.
+- **`wait` exiting 3 means "still queued", not "give up"** — the runner re-arms it. A run must never end sitting on *"waiting for the simulator"*; that's the one failure the whole design exists to prevent. (`acquire` is still there for callers that want a single non-blocking try.)
 - The key **identifies the physical target** — `web-<qa-port>` for the shared dev port, `sim-<udid>` for the Simulator — so a web task and a native task test at the same time, and every task sharing one target keys identically (the coordinator assigns the key; runners don't guess).
 - Web tasks serve their **own worktree** on a dedicated **qa-port** (separate from the port you run the app on yourself), under a teardown trap, so a task's QA never disturbs the app you're using and never leaks a server onto the shared port.
-- Reclaim is by **liveness, not a timer**: the holder's pid is recorded and `kill -0` decides — a crashed holder is reclaimed instantly, a slow-but-alive one (a 40-min native build) is never stolen. Long holds call `qa-lock refresh` to heartbeat; a TTL is only a backstop when the pid can't be checked.
+- Reclaim is by **liveness, not a timer**: the holder's pid is recorded and `kill -0` decides — a crashed holder is gone in ~90s, a slow-but-alive one (a 40-min native build) is never stolen. Long holds call `qa-lock refresh` to heartbeat; nothing heartbeat for an hour is treated as stuck.
+- **Pass the long-lived pid.** An agent runs each shell command in a throwaway shell, so `--pid $$` records a pid that's dead a second later and the hold looks crashed — `--pid $PPID` (the `claude` process) is the runner's real lifetime. A dead pid still gets a 90s grace, so a mistake can't hand one Simulator to two testers.
 
 ```bash
-qa-lock status                              # who's testing the shared app/Sim + who's queued (all targets)
-qa-lock whoami                              # holder of every target
-qa-lock acquire eng-123 --resource web-3100 --pid $$   # exit 0 = got it, 1 = busy (the runner loops on this)
-qa-lock refresh eng-123 --resource web-3100            # heartbeat during a long test
+qa-lock wait eng-123 --resource sim-abc --pid $PPID   # BLOCKS until it's yours: 0 = holding, 3 = still queued (run again)
+qa-lock acquire eng-123 --resource web-3100 --pid $PPID  # single try: 0 = got it, 1 = busy
+qa-lock refresh eng-123 --resource web-3100           # heartbeat during a long test
 qa-lock release eng-123 --resource web-3100
+qa-lock status                                        # who's testing the shared app/Sim + who's queued
 ```
 
-The parent renders the live picture from `cmux read-screen --surface <ref>` per task (what each runner is actually doing) + `qa-lock status` (the QA lane) — no extra plumbing. Note `cmux sidebar-state --json` reports **only the caller's own workspace**, so it can't be used to build this board.
+### Watching it from the parent
+
+Runners publish a phase at every transition (`qa-lock phase <id> <phase> "<note>"`), so the coordinator has one command instead of screen-scraping:
+
+```bash
+qa-lock board
+#   🔒 eng-101      qa          6m   native build + QA on the sim
+#   • eng-102      implement   14m  settings screen
+#   ⏳ eng-103      qa-wait     22m  queued 1320s for [sim-abc] behind eng-101
+#   ── QA lane ──
+#   🔒 [sim-abc] testing: eng-101  (372s, alive)
+#      ⏳ waiting: eng-103
+
+qa-lock board --follow 600     # blocks until ANY task changes phase / the lock changes hands, then prints
+```
+
+The coordinator runs `--follow` in the background, so it's woken by real events and can tell you what moved instead of guessing. For a closer look at one task it still reads that surface (`cmux read-screen --surface <ref>`) — note `cmux sidebar-state --json` reports **only the caller's own workspace**, so it can't build this board.
 
 Runners land as **labeled tabs in one pane inside your own workspace**, not as separate sidebar workspaces — see the layout rule in the [root README](../README.md#cmux-cli-facts-these-skills-depend-on).
 
@@ -87,7 +105,7 @@ Runners land as **labeled tabs in one pane inside your own workspace**, not as s
 | `skills/task-research/` | skill | discover tasks by theme across all MCPs, triage vs the codebase, fan out on your pick |
 | `skills/task-parallel/` | skill | fan out tasks you supply; stays alive to add more on the fly |
 | `skills/task-runner/`   | skill | per-task engine: architect plan → implement → CLAUDE.md check → tests → serialized QA → PR |
-| `bin/qa-lock.sh` (`qa-lock`) | CLI | the serialization lock — one tester at a time on the shared app/Simulator, keyed by resource |
+| `bin/qa-lock.sh` (`qa-lock`) | CLI | the serialization lock (one tester at a time on the shared app/Simulator, keyed by resource) **and** the task board the coordinator reads |
 
 It **reuses** the rest of claude-tools instead of duplicating it: [`team/`](../team/README.md) (architect, frontend/backend-engineer, automation-qa) to plan/build/test, [`qa/`](../qa/README.md) (manual-qa + qa-run) for the QA step, [`tickets/`](../tickets/README.md) (the `ticket` skill) to create the ticket + PR text, and `cmux` for the surfaces.
 
@@ -107,7 +125,7 @@ Then restart Claude Code once. Requires `git`, `cmux` (macOS) and a connected **
 - **Research a theme:** *"run task research routine — all the bugs and features about app V2"* → tick the triage → confirm → it runs.
 - **Run links directly:** *"run these in parallel: https://linear.app/…/ENG-123, https://…/ENG-140"*.
 - **Add on the fly:** while they run, *"also run this one: https://linear.app/…/ENG-155"*.
-- **Watch it:** the `TASK-<id>` workspaces in the cmux sidebar show each runner's live phase; ask for a board any time and the coordinator renders sidebar + `qa-lock status`.
+- **Watch it:** ask for a board any time — the coordinator prints `qa-lock board` (every task's phase + the QA queue) and keeps a `--follow` running so it reports movement on its own. The labeled tabs in your workspace show the live output of any one runner.
 
 ## Uninstall
 

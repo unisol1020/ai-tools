@@ -62,7 +62,9 @@ cmux rename-tab --surface "$sref" "$n · $id"
 
 # per-task env is SOURCED in the command: --env-file is workspace-level and cannot carry
 # N different port/cred sets. And `claude` must be launched explicitly (see below).
-cmux send --surface "$sref" "cd $wt && set -a && . $state/qa.env && set +a && clear && claude '/task-runner brief=$state/BRIEF.md worktree=$wt branch=$branch base=<base> resource=<web-PORT|sim-UDID> mode=code tests=on qa=on pr=on'\n"
+cmux send --surface "$sref" "cd $wt && set -a && . $state/qa.env && set +a && clear && claude '/task-runner id=$id brief=$state/BRIEF.md worktree=$wt branch=$branch base=<base> resource=<web-PORT|sim-UDID> mode=code tests=on qa=on pr=on'\n"
+
+qa-lock phase "$id" launching "tab $n · base <base> · resource <key>"   # so the board shows it before the runner's first report
 ```
 - **`--command` is typed into a plain login shell, NOT into Claude.** A **CLI-created** workspace does **not** honour the `newWorkspaceCommand: "claude"` setting in `cmux.json` — that only fires for workspaces made from the UI's global `+`. Verified: with `newWorkspaceCommand` present in the live config, a `cmux workspace create --command …` probe still landed in `-/bin/zsh`. So a bare `/task-runner …` dies as `zsh: no such file or directory` and you are left with an **idle shell that looks like a running agent**. Launch Claude explicitly and pass the prompt as its argument: `--command "claude '/task-runner …'"`. Keep the prompt to the short pointer above; the runner reads `BRIEF.md` and the env-file for the rest. **Always confirm with `cmux read-screen` that Claude actually booted before reporting a task as started.**
 - `--focus false` so focus isn't stolen; **stagger** launches a second or two apart so `git worktree add` calls don't race.
@@ -97,16 +99,37 @@ Rules that follow from this:
 - Cleanup caveat: the CLI **cannot close a workspace** (`Cannot close the last surface`; `workspace-action` only offers close-others/above/below, which would take the user's real ones). So don't create throwaway workspaces you'd need to clean up — the user has to ⌘⇧W them by hand. One more reason to stay in the caller's workspace.
 
 ## Step 4 — Babysit: keep it legible, don't interfere
-You stay in the main thread. You do **not** arbitrate testing (the QA-lock does) — you make the batch legible and step in only when a runner needs a human:
-- **Live board on request / on events**, from what's already there:
+You stay in the main thread. You do **not** arbitrate testing (the QA-lock does) — you make the batch legible and step in only when a runner needs a human. **The user's window into the batch is you**, so a silent coordinator is a broken one.
+
+- **`qa-lock board` is the board.** Runners publish a phase at every transition; one command shows all of them plus the QA lane:
   ```bash
-  cmux list-workspaces          # find the TASK-* workspace refs (short refs are volatile — re-resolve)
-  cmux read-screen --workspace <ref> --lines 40   # what that runner is actually doing, per task
-  # NOTE: `cmux sidebar-state --json` reports ONLY the caller's own workspace — it cannot
-  # enumerate the task workspaces. Do not build the board from it.
-  qa-lock status                # who's testing the shared app/Sim + who's queued
+  qa-lock board
+  #   🔒 eng-101      qa          6m   native build + QA on the sim
+  #   • eng-102      implement   14m  settings screen
+  #   ⏳ eng-103      qa-wait     22m  queued 1320s for [sim-abc] behind eng-101
+  #   ── QA lane ──
+  #   🔒 [sim-abc] testing: eng-101  (372s, alive)
+  #      ⏳ waiting: eng-103
   ```
-  Render a tight board: each task → phase (plan/implement/check/tests/qa/PR/done) + the QA lane (🔒 testing: X · ⏳ waiting: Y).
+  **Print it right after fan-out, and again on every user turn** — even an unprompted "still going" beats silence. Relay it as-is plus one line of interpretation ("eng-103 is 3rd in the sim queue, ~20 min out").
+- **Get woken on changes instead of guessing.** Run this as a **background** call (`run_in_background: true`); it returns the moment any task changes phase or the lock changes hands, and your harness re-invokes you with the new board:
+  ```bash
+  qa-lock board --follow 600      # exit 0 = something changed (board printed), 3 = quiet for 10 min
+  ```
+  Report the delta to the user in a line, then **re-arm it**. That is the whole babysit loop — no polling, no sleeping in the foreground. (Exit 3 is also worth relaying: "no movement in 10 min" is information, and it's your cue to check for a stalled runner.)
+- **Deeper look at one task** when the board isn't enough:
+  ```bash
+  cmux tree                                       # resolve the tab by name (short refs go stale — re-resolve every time)
+  cmux read-screen --surface <ref> --lines 40      # what that runner is actually doing
+  # NOTE: `cmux sidebar-state --json` reports ONLY the caller's own workspace — it cannot
+  # enumerate the task surfaces. Do not build the board from it.
+  ```
+- **Un-stick a stalled runner.** The classic failure: a task announces "waiting for the simulator" and then just stops. Symptoms on the board — phase `qa-wait` with a note minutes old while the lock's queue doesn't list it, or any task whose phase hasn't moved in ~20 min while the lock lane is busy. Check its screen, and if it's sitting idle at a prompt, poke that surface (only one you spawned):
+  ```bash
+  cmux send --surface <its-ref> "Not done: re-run 'qa-lock wait <id> --resource <key> --pid \$PPID --timeout 1800' in the BACKGROUND and continue when it exits 0."
+  cmux send-key --surface <its-ref> enter
+  ```
+  Tell the user you did it. A crashed holder is not your problem — the lock reclaims it on its own.
 - **Surface blockers.** A runner that hits a true blocker (missing creds, a high-risk change, QA not converging) `cmux notify`s and sets a needs-input status. Relay it to the user, then pass their answer to **that surface only**:
   ```bash
   cmux send --surface <its-surface-ref> "<the answer>"       # only a surface YOU spawned
@@ -131,5 +154,6 @@ The point of staying alive: while the batch runs, the user can say *"also run th
 - **No per-task Docker.** Plain worktrees; QA against the user's one real app / one Simulator, serialized by `qa-lock` keyed on the physical target. (Full isolation = `loop-engine`.)
 - **Don't steal focus.** `--focus false`, additive layout, anchor to `CMUX_WORKSPACE_ID`; only ever `cmux send` to a surface you spawned.
 - **Brief as a file, secrets as an env-file, command short.** Never inline long/quoted task text or creds on the launch command.
-- **The lock arbitrates testing, not you.** You display the QA lane; you don't hand out turns.
+- **The lock arbitrates testing, not you.** You display the QA lane; you don't hand out turns. But a runner that goes *silent* while queued is a bug, not patience — poke it (Step 4).
+- **Never go quiet.** Board after fan-out, board on every user turn, and a background `qa-lock board --follow` in flight between them. "I have nothing to report" is itself a report.
 - **Reuse the pieces.** per-task work → **task-runner**; surfaces/status → **cmux**; QA creds/URL → **qa-run** config; serialization → **qa-lock**. You orchestrate and keep it visible.
