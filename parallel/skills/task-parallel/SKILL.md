@@ -29,19 +29,25 @@ git worktree add "$wt" -b "$id" "<base>"                                # plain 
 state="${PARALLEL_LOCK_DIR:-$HOME/.cache/parallel-tasks}/$id"; mkdir -p "$state"
 # BRIEF.md: the task description + EVERY constraint/lens + ticket id/url + design links (multi-line, quotes — all safe here)
 printf '%s\n' "<task + constraints + ticket + design links>" > "$state/BRIEF.md"
-# qa.env: config + creds, loaded into the child's environment (not on the command line, so no leak / no quoting)
+# qa.env: config + creds, loaded into the child's environment (not on the command line, so no leak).
+# QUOTE EVERY VALUE. This file is `source`d by the launch command, so an unquoted value
+# containing spaces is EXECUTED, not assigned: `DEV_CMD=bunx expo start --web` sets
+# DEV_CMD=bunx and then runs `expo start --web` -> "command not found: expo". Worse, the
+# failing source makes the `&& claude …` chain short-circuit, so you get a bare shell that
+# looks like a launched agent. Verify with:
+#   bash -n <(printf 'set -a\n'; cat "$state/qa.env"; printf 'set +a\n')
 cat > "$state/qa.env" <<EOF
-QA_PORT=<port>
-DEV_CMD=<dev-cmd>
-QA_READY_PATH=<ready-path>
-QA_USER=<user>
-QA_PASS=<pass>
-SIM_UDID=<udid>
-XCODE_PROJECT=<proj>
-XCODE_SCHEME=<scheme>
-TRACKER=<linear|jira>
-TEAM=<team>
-PROJECT=<project>
+QA_PORT="<port>"
+DEV_CMD="<dev-cmd>"
+QA_READY_PATH="<ready-path>"
+QA_USER="<user>"
+QA_PASS="<pass>"
+SIM_UDID="<udid>"
+XCODE_PROJECT="<proj>"
+XCODE_SCHEME="<scheme>"
+TRACKER="<linear|jira>"
+TEAM="<team>"
+PROJECT="<project>"
 EOF
 
 # ONE shared runner pane in the CALLER's workspace — create it for the FIRST task only.
@@ -103,8 +109,16 @@ You stay in the main thread. You do **not** arbitrate testing (the QA-lock does)
   Render a tight board: each task → phase (plan/implement/check/tests/qa/PR/done) + the QA lane (🔒 testing: X · ⏳ waiting: Y).
 - **Surface blockers.** A runner that hits a true blocker (missing creds, a high-risk change, QA not converging) `cmux notify`s and sets a needs-input status. Relay it to the user, then pass their answer to **that surface only**:
   ```bash
-  cmux send --surface <its-surface-ref> "<the answer>\n"     # \n submits; only a surface YOU spawned
+  cmux send --surface <its-surface-ref> "<the answer>"       # only a surface YOU spawned
+  cmux send-key --surface <its-surface-ref> enter            # submit; a multi-line send needs this
   ```
+  **Re-resolve the ref every time, and never suppress the send's output.** Short refs are
+  reassigned as surfaces move — a ref you captured at launch WILL go stale, and
+  `cmux send --surface <stale>` fails with `not_found`. Pipe it to `/dev/null` and you have
+  silently dropped the message while believing it was delivered. Resolve by tab name from
+  `cmux tree`, check the send prints `OK`, then confirm the input line is empty (a queued paste
+  sits in the buffer unsubmitted until it gets its `enter`; `Press up to edit queued messages`
+  means it went through and the runner will pick it up when its current turn ends).
 - **Report as each finishes.** When a runner opens its PR (or stops with "no PR, because …"), note it: task → PR url + base, or the reason it skipped. Nothing silently dropped.
 
 ## Step 5 — Add tasks on the fly
