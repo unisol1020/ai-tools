@@ -1,11 +1,11 @@
 ---
 name: qa-run
-description: Orchestrate a manual-QA pass (functional or design) on the running app in ANY project. Detects whether the project is a single app or a monorepo, remembers a dev URL and login credentials PER APP, plus an optional read-only DB, asking only for what isn't saved yet (and remembering "declined" so it never re-asks). Then scopes the run to the app(s) being tested and invokes the manual-qa agent. Use when the user asks to "QA this", "verify the app works", "test the flow", "check if X works / looks right in the browser", or invokes /qa-run. Runs in the MAIN thread (it needs to ask the user questions); it sets up context, then delegates the click-through to the manual-qa subagent. Also supports an unattended task mode where the loop-engine injects a per-task URL/port + worktree and no questions are asked.
+description: Orchestrate a manual-QA pass (functional or design) on the running app in ANY project — a WEB app in a browser or a NATIVE iOS app in the Simulator. Detects whether the project is a single app or a monorepo, remembers a dev URL and login credentials PER APP, plus an optional read-only DB, asking only for what isn't saved yet (and remembering "declined" so it never re-asks). Then scopes the run to the app(s) being tested and invokes the manual-qa agent. Use when the user asks to "QA this", "verify the app works", "test the flow", "check if X works / looks right in the browser", "test the native app / in the simulator", or invokes /qa-run. Runs in the MAIN thread (it needs to ask the user questions); it sets up context, then delegates the click-through to the manual-qa subagent. Also supports an unattended task mode where the loop-engine injects a per-task URL/port (or Simulator UDID) + worktree and no questions are asked.
 ---
 
 # qa-run — per-project QA orchestrator
 
-You (the **main thread**) run this skill to QA a running web app. The manual-qa subagent cannot prompt the user, so YOU gather per-project setup here, persist it, then spawn `manual-qa` with the resolved context. Re-run any time — saved answers are skipped.
+You (the **main thread**) run this skill to QA a running app — **web** (browser) or **native iOS** (Simulator). The manual-qa subagent cannot prompt the user, so YOU gather per-project setup here, persist it, then spawn `manual-qa` with the resolved context. Re-run any time — saved answers are skipped.
 
 ## Config file (per project, gitignored)
 
@@ -17,20 +17,21 @@ State lives in `<project-root>/.claude/qa.local.json`. URLs and credentials are 
   "apps": [
     { "name": "web-a", "url": "http://localhost:3000",
       "credentials": { "status": "set", "loginUrl": "http://localhost:3000/login", "username": "...", "password": "..." } },
-    { "name": "web-b", "url": "http://localhost:3001", "credentials": { "status": "declined" } }
+    { "name": "web-b", "url": "http://localhost:3001", "credentials": { "status": "declined" } },
+    { "name": "mobile", "platform": "native", "credentials": { "status": "set", "username": "...", "password": "..." } }
   ],
   "db": { "status": "set|declined|no-mcp", "access": "mcp|psql", "tool": "mcp__<server>__<readonly_sql_tool> | psql", "url": "...", "env": "local|dev|prod" }
 }
 ```
 
-`status` is the memory: `set` = use it · `declined` = user said no, **never ask again** · `no-mcp` = no DB MCP connected. Missing entry/field = ask. A single-app project just has one entry in `apps`.
+`status` is the memory: `set` = use it · `declined` = user said no, **never ask again** · `no-mcp` = no DB MCP connected. Missing entry/field = ask. A single-app project just has one entry in `apps`. `platform` defaults to `"web"`; `"native"` marks an iOS app whose target is the Simulator, so it carries no `url` and the URL gate is skipped for it forever.
 
 ## Task mode (unattended — driven by the loop engine)
 
 When the **loop-engine** invokes you for a parallel task run, it passes a resolved context and you **do not prompt the user** (the run is unattended). The context: `{ taskId, worktree, app, url, dbUrl? }` where `url` is the task's **isolated app port** from the devops/`task-env` manifest (e.g. `http://localhost:54123`), not the project's normal dev URL.
 
 In task mode:
-- **Use the passed `url`** as the target — skip the URL gate entirely (don't ask, don't probe the default port).
+- **Use the passed `url`** as the target — skip the URL gate entirely (don't ask, don't probe the default port). A **native** task passes a Simulator UDID (`SIM_UDID`) + Xcode project/scheme instead of a `url`; pass those straight through to `manual-qa` and run it in NATIVE platform mode.
 - **Creds are per app, reused across tasks.** Read the app's `credentials` from the **main repo's** `.claude/qa.local.json` (`git rev-parse --git-common-dir` → the shared repo, since this file is gitignored and won't exist in a fresh worktree checkout); a `<worktree>/.claude/qa.local.json` overrides if present. `set` → log in with them; `declined`/missing → run unauthenticated and let manual-qa emit `BLOCKED_AT_LOGIN` if it hits a wall (the loop surfaces that to the user; you never invent creds).
 - **DB:** if a `dbUrl` was passed, use it read-only for the cross-check; otherwise honor the project's `db` config. Don't ask.
 - Then go straight to step 8 (invoke `manual-qa`) with that context, and step 11 (report the verdict back to the loop).
@@ -45,11 +46,13 @@ The interactive steps below apply only to **human-initiated** runs (someone asks
 
 3. **Detect project shape (only matters on first setup).** Monorepo if any of: root `package.json` has `workspaces`, or there's `pnpm-workspace.yaml` / `turbo.json` / `nx.json`, or multiple `apps/*/package.json`. Collect candidate apps from `apps/*` (and `packages/*` if they're runnable) and guess each dev URL from its `package.json` dev script (`--port`) or framework default. Otherwise it's a single app (name = repo dir).
 
-4. **Scope this run.** Decide which app(s) this QA/design pass targets:
+4. **Scope this run.** Decide which app(s) this QA/design pass targets, and on which **platform**:
    - From the user's ask ("test **web-a** login", "check **web-b**") or from `git diff --name-only` (which `apps/*` changed).
    - If still ambiguous and there are multiple apps → **AskUserQuestion**: "Which app is in scope for this run?" (list detected apps + "all").
+   - **Platform: web (default) or native iOS.** Native if the user said "native" / "iOS" / "simulator" / "the app on the phone", or the app's saved `platform` is `"native"`, or the change lives in native/React-Native/Expo/`ios/` code that no browser can exercise. A booted simulator (`xcrun simctl list devices booted`) is a strong native signal; a running dev server is a web signal. State the platform you picked. First time an app resolves to native, save `"platform": "native"` on its entry.
+   - **Native run, macOS + Xcode only.** Check the Xcode MCP (`claude mcp get xcode`); if it's missing, register it (`claude mcp add -s user --transport stdio xcode -- xcrun mcpbridge`), tell the user it surfaces after a restart plus the one-time Xcode setup (Settings ▸ Intelligence ▸ "Allow external agents to use Xcode tools", Accessibility permission for the terminal), and run this pass against the **web build** if the app has one — otherwise stop and say native QA isn't available yet. `manual-qa` handles booting the simulator and building/launching the app.
 
-5. **URL gate (per in-scope app) — LOCAL FIRST.** For each app in scope, if its `url` isn't saved:
+5. **URL gate (per in-scope WEB app) — LOCAL FIRST.** Skip this entirely for a native app — its target is the Simulator, not a URL (an Expo app being tested in a browser is a *web* run and does need one). For each web app in scope, if its `url` isn't saved:
    - **Probe local before asking.** Read `.claude/qa.local.json` and probe the app's expected local dev port(s) — from its `package.json` dev script (`--port`), the framework default, or the common set (`3000 3001 8081 5173 4321 19006`) — with `curl -sI` / `lsof -i -P | grep LISTEN`. If a local server is already serving the app, use it and skip the prompt.
    - Nothing local running → **AskUserQuestion / prompt**: "What URL should I use for **<app>**?" — pre-fill the detected port (e.g. `http://localhost:3000`). On a monorepo first-run, offer to capture URLs for **all** detected apps at once so it remembers them all. Write each into `apps[].url`.
    - Prefer a live port: confirm with `curl -sI <url>` / `lsof -i -P | grep LISTEN`. If the server's down, ask whether to start it (background it, wait for the port) — don't assume.
@@ -69,7 +72,7 @@ The interactive steps below apply only to **human-initiated** runs (someone asks
      - **Decline (don't ask again)** → `status:declined`.
    - **The DB URL must be a local or dev database.** Say this explicitly when asking. If the user hands over a **production** URL, warn once that QA will read prod and that they're accepting the risk; proceed only on explicit confirmation, record `env:"prod"`, and never run anything but read-only queries.
 
-8. **Invoke `manual-qa`** (Agent tool), once per in-scope app, with a self-contained prompt: the **mode** (functional vs design — infer from the ask), the app's **url**, its **credentials** if `status:set` (tell it to log in via the UI first), and — for design — the Figma link found in the conversation or a request to the user for a Figma link / screenshot. State whether DB verification is available.
+8. **Invoke `manual-qa`** (Agent tool), once per in-scope app, with a self-contained prompt: the **platform** (web or native, and why you picked it), the **mode** (functional vs design — infer from the ask), the app's **url** (web) or the Xcode project/workspace + scheme and booted simulator UDID if you know them (native), its **credentials** if `status:set` (tell it to log in via the UI first), and — for design — the Figma link found in the conversation or a request to the user for a Figma link / screenshot. State whether DB verification is available.
 
 9. **Handle a login block.** If manual-qa returns `BLOCKED_AT_LOGIN: <what>` (needed auth, none provided), **ping the user**: "manual-qa is blocked at login for **<app>** — provide credentials now? (saved to this project)". Yes → collect, store `status:set`, re-invoke. No → report what was/wasn't verifiable.
 
