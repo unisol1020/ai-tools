@@ -87,9 +87,16 @@ Verified against the live CLI, not assumed — each one silently broke a fan-out
 - **`sidebar-state --json` reports only the caller's own workspace.** It cannot enumerate other workspaces, so a status board must come from `list-workspaces` + `read-screen`.
 - **`send --surface` / `list-pane-surfaces`** are the real command names (not `send-surface` / `list-surfaces`).
 - **The CLI cannot close a workspace** — `Cannot close the last surface`, and `workspace-action` only offers close-others/above/below, which would take the user's real ones. So never create throwaway workspaces; the user has to close them by hand.
-- **Short refs are volatile.** Re-resolve `workspace:2` / `surface:7` each time; don't cache them across steps.
+- **Short refs are volatile, and a stale one fails silently if you let it.** `workspace:2` / `surface:7` get reassigned when surfaces move, so a ref captured at launch goes stale and `send --surface` fails with `not_found`. Pipe that to `/dev/null` and you have dropped a message while believing it was delivered. Re-resolve by tab name from `cmux tree` each time, and require the send to print `OK`.
+- **A multi-line `send` does not submit itself.** Long text arrives as a collapsed paste and sits in the input buffer until it gets its own `send-key … enter`. Confirm the input line is empty afterwards; `Press up to edit queued messages` means it went through and the agent will pick it up when its current turn ends.
 
 **Layout rule for parallel runners:** put them in the **caller's workspace as labeled tabs in one pane**, and `rename-tab` every one. Both alternatives were tried and failed — a separate workspace per task gets buried in a crowded sidebar, and one pane per task is ~15 characters wide and physically unreadable.
+
+**Env rule for parallel runners:** `qa.env` is **`source`d** by the launch command, so **every value must be quoted**. An unquoted value containing a space is *executed*, not assigned — `DEV_CMD=bunx expo start --web` sets `DEV_CMD=bunx` and then runs `expo start --web`. The failing source then short-circuits the `&& claude …` chain, so you get a bare shell that looks exactly like a launched agent. A workspace-level `--env-file` parses `KEY=VALUE` safely and needs no quoting, but it cannot carry N different port/cred sets, which is why per-tab fan-out sources instead. Verify before launching:
+
+```bash
+bash -n <(printf 'set -a\n'; cat "$state/qa.env"; printf 'set +a\n')
+```
 
 ## Adding a new tool to this repo
 

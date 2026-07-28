@@ -76,7 +76,9 @@ qa-lock refresh eng-123 --resource web-3100            # heartbeat during a long
 qa-lock release eng-123 --resource web-3100
 ```
 
-The parent renders the live picture from `cmux sidebar-state --json` (each task's phase/progress) + `qa-lock status` (the QA lane) — no extra plumbing.
+The parent renders the live picture from `cmux read-screen --surface <ref>` per task (what each runner is actually doing) + `qa-lock status` (the QA lane) — no extra plumbing. Note `cmux sidebar-state --json` reports **only the caller's own workspace**, so it can't be used to build this board.
+
+Runners land as **labeled tabs in one pane inside your own workspace**, not as separate sidebar workspaces — see the layout rule in the [root README](../README.md#cmux-cli-facts-these-skills-depend-on).
 
 ## What you get
 
