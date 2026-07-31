@@ -10,7 +10,7 @@ One agent, **two modes × two platforms**, both picked from how you ask:
 …and both modes run on either platform:
 
 - **Web** (default) — a real browser via the **Playwright MCP** (required); the **Orca** browser CLI or Claude Desktop as fallback capture.
-- **Native iOS** — the booted **Simulator**, driven through the **Xcode MCP** (`xcrun mcpbridge`) + `simctl` screenshots and coordinate-mapped taps. Say *"test the native app"* / *"on iOS"* / *"in the simulator"*; if you don't say it, the platform is inferred from where the change lives and what's running. macOS + Xcode only — with no Xcode MCP it registers it for next time and tests the web build this run.
+- **Native iOS** — the booted **Simulator**, driven preferably through the **Orca emulator CLI** (`orca emulator` tap/type/gesture/ax) when Orca is installed; otherwise the **Xcode MCP** (`xcrun mcpbridge`) + `simctl` screenshots + coordinate-mapped taps. Say *"test the native app"* / *"on iOS"* / *"in the simulator"*; if you don't say it, the platform is inferred from where the change lives and what's running. macOS only — with neither Orca nor Xcode MCP it registers Xcode for next time and tests the web build this run.
 
 The first time you QA a project, it asks once for the app's URL, optional login, and an optional read-only DB — then remembers your answers per project (including "no, don't ask again") and stops nagging. A native run skips the URL question entirely — the Simulator is the target.
 
@@ -27,10 +27,10 @@ flowchart TD
     D --> E[invoke manual-qa subagent<br/>with resolved context]
     E --> P{platform — you said it,<br/>or inferred from the change}
     P -->|web, default| W["WEB target:<br/>Playwright MCP browser<br/>(Orca CLI as fallback)"]
-    P -->|native iOS| N["NATIVE target:<br/>Xcode MCP + booted Simulator,<br/>simctl screenshots + taps"]
+    P -->|native iOS| N["NATIVE target:<br/>Orca emulator CLI preferred,<br/>else Xcode MCP + simctl taps"]
     W --> F{mode from the ask}
     N --> F
-    N -.->|no Xcode MCP:<br/>register it, test web this run| W
+    N -.->|no Orca and no Xcode MCP:<br/>register Xcode, test web this run| W
     F -->|does it work| G[FUNCTIONAL:<br/>success + error paths,<br/>edge cases real users hit]
     F -->|does it look right| H[DESIGN:<br/>screenshot UI vs Figma<br/>at ≥90% bar]
     G --> V[report PASS / FAIL / PARTIAL<br/>+ evidence]
@@ -75,11 +75,11 @@ You don't run anything. Paste this file (or its URL) into **Claude Code** and sa
 >    > ✅ **Installed.** Restart Claude Code once so the browser tools and the QA agent load.
 >    >
 >    > **How to use it — just ask, no commands:**
->    > 1. Start your app's dev server (so there's a URL to open) — or, for the native iOS app, have Xcode open with your project and a Simulator booted.
+>    > 1. Start your app's dev server (so there's a URL to open) — or, for the native iOS app, boot a Simulator (Orca preferred if installed; otherwise Xcode open with your project).
 >    > 2. Tell me what to check, in plain words:
 >    >    - *Does it work?* → "check if login works", "verify checkout", "does the Save button actually save?"
 >    >    - *Does it look right?* → "does /pricing match this Figma <link>", "is the header pixel-perfect vs this screenshot?"
->    >    - *On the native app?* → "test the native app", "check it in the simulator", "does the iOS profile screen match Figma?" (macOS + Xcode; one-time: enable Xcode ▸ Settings ▸ Intelligence ▸ "Allow external agents to use Xcode tools" and give your terminal Accessibility permission)
+>    >    - *On the native app?* → "test the native app", "check it in the simulator", "does the iOS profile screen match Figma?" (macOS; prefers Orca `emulator` control when available, else Xcode MCP — one-time for Xcode fallback: enable Xcode ▸ Settings ▸ Intelligence ▸ "Allow external agents to use Xcode tools" and give your terminal Accessibility permission)
 >    > 3. **First time in a project** I'll ask you once (and remember per project): which app + its **URL** (localhost by default; a non-localhost URL is used only at your own risk), whether to use a **login** (or "no, never ask"), and how to verify the **DB** — via a connected MCP (e.g. Supabase), or `psql` with a read-only **DB URL** you provide (local/dev — prod only at your own risk).
 >    > 4. I then drive a **real browser** and report **PASS / FAIL** with exactly what I saw. For *works* checks I follow the flow, click, and watch for errors. For *looks-right* checks I screenshot the page and compare it to your Figma/screenshot at a **90%+ / 1:1** bar and list every difference.
 >    > 5. For a design check, **give me a Figma link or a screenshot** of the target — if you don't, I'll ask for one.
@@ -103,11 +103,11 @@ Then restart Claude Code.
 - [Claude Code](https://claude.com/claude-code), Node.js (for `npx`), git.
 - **Browser:** the Playwright MCP is required and runs in any terminal. If its tools aren't loaded in a session, the agent falls back to the **Orca** browser CLI (`orca tab create`, `orca snapshot`, `orca click`, `orca screenshot`) — still a real browser.
 - First Playwright run downloads Chromium once (~100MB), so the first `browser_navigate` is slow.
-- **Native iOS QA (optional):** macOS + Xcode 26+ (for `xcrun mcpbridge`), the Xcode MCP registered, "Allow external agents to use Xcode tools" enabled, and Accessibility permission for your terminal. Without any of it, web QA works exactly as before.
+- **Native iOS QA (optional):** macOS + a booted Simulator. Prefers the **Orca** CLI (`orca emulator`) when installed; otherwise Xcode 26+ (`xcrun mcpbridge`), the Xcode MCP registered, "Allow external agents to use Xcode tools" enabled, and Accessibility permission for your terminal (System Events taps). Without any of it, web QA works exactly as before.
 
 ## Use it (in any project)
 
-1. Start the project's dev server (so there's a URL) — or, for native, open the project in Xcode and boot a Simulator.
+1. Start the project's dev server (so there's a URL) — or, for native, boot a Simulator (and have Orca and/or Xcode available).
 2. Ask Claude Code, in plain words:
    - **Web:** *"QA the login flow"* · *"verify checkout works"* · *"check if the save button on /settings actually fires a request"* · *"test the dashboard on a mobile viewport"* · *"does the dashboard match this Figma: \<link\>"*
    - **Native iOS:** *"test the native app"* · *"check the signup flow in the simulator"* · *"does the iOS home screen match this Figma: \<link\>"* — say nothing about the platform and it infers one from the change (native/Expo/`ios/` code + a booted Simulator → native; a web app or a handed-in URL → web).
@@ -148,19 +148,22 @@ Your choices live in `<project>/.claude/qa.local.json` (see `templates/qa.local.
 |------|----------|
 | **Playwright MCP** | web QA in a real browser — flows, forms, forced error states (network mocking), mobile/offline/geo, screenshots. Required; works everywhere. |
 | **Orca** browser CLI (optional) | fallback real browser when the Playwright MCP tools aren't loaded — `orca tab create`, `orca snapshot`, `orca click`, `orca screenshot`, `orca set offline\|device`, `orca storage local set`. |
-| **Xcode MCP** (`xcrun mcpbridge`) + `simctl` | **native iOS QA** — build/launch on the booted Simulator, `simctl io screenshot` as the snapshot primitive, coordinate-mapped taps/keystrokes via System Events, `simctl spawn log stream` for crashes. macOS + Xcode 26+. |
+| **Orca** emulator CLI (preferred for native) | **native iOS QA** when Orca is installed — `orca emulator devices\|attach\|tap\|type\|gesture\|button\|ax` (normalized 0..1 coords); use `xcrun simctl` alongside for install/launch/screenshot. |
+| **Xcode MCP** (`xcrun mcpbridge`) + `simctl` | **native iOS QA fallback** — build/launch on the booted Simulator, `simctl io screenshot`, coordinate-mapped taps/keystrokes via System Events, `simctl spawn log stream`. macOS + Xcode 26+. |
 | **Maestro** | native **Android** / cross-platform flow scripting — not part of this toolset; use it directly. |
 
-For design mode on web, `manual-qa` captures the running UI with the first available of: Playwright MCP screenshot → Orca browser CLI → Claude Desktop browser → Chrome-connected browser → else it tells you to enable one. On native, the `simctl` screenshot *is* the capture, compared to the Figma frame at the same ≥90% / 1:1 bar.
+For design mode on web, `manual-qa` captures the running UI with the first available of: Playwright MCP screenshot → Orca browser CLI → Claude Desktop browser → Chrome-connected browser → else it tells you to enable one. On native, a Simulator screenshot (`simctl` or Orca) *is* the capture, compared to the Figma frame at the same ≥90% / 1:1 bar.
 
-### Native iOS — one-time setup
+### Native iOS — setup
 
-The installer registers the Xcode MCP for you on macOS. Two things only you can do:
+**Preferred:** install [Orca](https://orca.computer) so `orca` is on PATH with emulator support (`orca emulator --help`). Agents attach a device and drive taps/type/gestures without Accessibility clicks.
+
+**Fallback (Xcode):** the installer registers the Xcode MCP for you on macOS. Two things only you can do:
 
 1. **Xcode ▸ Settings ▸ Intelligence ▸ "Allow external agents to use Xcode tools"** — enable it once (without it the bridge just hangs).
-2. **Grant your terminal Accessibility permission** (System Settings ▸ Privacy & Security ▸ Accessibility) so taps and keystrokes can be sent into the Simulator.
+2. **Grant your terminal Accessibility permission** (System Settings ▸ Privacy & Security ▸ Accessibility) so System Events taps/keystrokes can be sent into the Simulator when Orca isn't available.
 
-At QA time, keep **Xcode open with your project** and a **booted Simulator** (`xcrun simctl list devices booted`) — the agent boots one and builds/launches the app if needed, but prefers whatever's already running (it won't kill your metro/Expo session).
+At QA time, keep a **booted Simulator** (`orca emulator devices --json` or `xcrun simctl list devices booted`) — the agent attaches/boots one and builds/launches the app if needed, but prefers whatever's already running (it won't kill your metro/Expo session). For Xcode-path builds, keep **Xcode open with your project**.
 
 ## Override per project
 

@@ -56,9 +56,10 @@ Requirements: Node.js (for npx) and Claude Code. All web QA runs in a real brows
 Playwright MCP; if its tools aren't loaded in a session, the agent falls back to the Orca
 browser CLI (optional).
 
-Native iOS QA (optional, macOS + Xcode 26+): the installer registered the Xcode MCP
-(xcrun mcpbridge). Enable Xcode > Settings > Intelligence > "Allow external agents to use
-Xcode tools" once, keep Xcode open with your project when testing, and grant your terminal
-Accessibility permission (System Settings > Privacy & Security) so the agent can tap the
-Simulator. Then ask: "test the native app" / "check it in the simulator".
+Native iOS QA (optional, macOS): prefers the Orca emulator CLI when `orca` is on PATH
+(`orca emulator devices|attach|tap|type|gesture|button|ax`). Otherwise uses the Xcode MCP
+(xcrun mcpbridge) registered above — enable Xcode > Settings > Intelligence > "Allow external
+agents to use Xcode tools" once, keep Xcode open with your project when testing, and grant
+your terminal Accessibility permission (System Settings > Privacy & Security) so System Events
+taps work. Then ask: "test the native app" / "check it in the simulator".
 DONE

@@ -1,7 +1,7 @@
 ---
 name: manual-qa
 model: inherit
-description: Use when a change needs to be exercised in a real running app — not unit tests, but a human-style check of the live UI. ALWAYS drives a REAL BROWSER via the Playwright MCP for web work. Two modes, picked from the ask. (1) FUNCTIONAL — "does it work": click-through flows, forms, error states, mobile/offline — plus the regression surface around the change and the edge cases a real user hits. (2) DESIGN — "does it look right / match the design / pixel-perfect / match Figma": screenshots the running UI and compares it to a Figma frame or a reference screenshot at a ≥90% / 1:1 bar, reporting every difference. Both modes run on WEB or NATIVE iOS: "test the native app / on iOS / in the simulator" drives the iOS Simulator via the Xcode MCP (xcrun mcpbridge) + simctl screenshots + accessibility-mapped clicks, falling back to the web build when the Xcode MCP isn't installed; when "native" isn't stated the platform is inferred from context (where the change lives, what's running). Invoke on "manually test", "click through", "verify in the browser", "QA the flow", "reproduce the bug", "check it works", "does it match the design", "compare to Figma", "is it pixel-perfect", "test the native app", "check in the simulator". Receives login creds + context from the qa-run skill / parent — including, for parallel loop runs, a per-task URL/port and worktree. Does NOT write tests and does NOT edit production code.
+description: Use when a change needs to be exercised in a real running app — not unit tests, but a human-style check of the live UI. ALWAYS drives a REAL BROWSER via the Playwright MCP for web work. Two modes, picked from the ask. (1) FUNCTIONAL — "does it work": click-through flows, forms, error states, mobile/offline — plus the regression surface around the change and the edge cases a real user hits. (2) DESIGN — "does it look right / match the design / pixel-perfect / match Figma": screenshots the running UI and compares it to a Figma frame or a reference screenshot at a ≥90% / 1:1 bar, reporting every difference. Both modes run on WEB or NATIVE iOS: "test the native app / on iOS / in the simulator" prefers the Orca emulator CLI (`orca emulator`) when Orca is available, otherwise falls back to the Xcode MCP (xcrun mcpbridge) + simctl screenshots + accessibility-mapped clicks, and to the web build when neither can drive the Simulator; when "native" isn't stated the platform is inferred from context (where the change lives, what's running). Invoke on "manually test", "click through", "verify in the browser", "QA the flow", "reproduce the bug", "check it works", "does it match the design", "compare to Figma", "is it pixel-perfect", "test the native app", "check in the simulator". Receives login creds + context from the qa-run skill / parent — including, for parallel loop runs, a per-task URL/port and worktree. Does NOT write tests and does NOT edit production code.
 tools: Read, Grep, Glob, Bash, mcp__playwright__browser_navigate, mcp__playwright__browser_navigate_back, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_fill_form, mcp__playwright__browser_select_option, mcp__playwright__browser_hover, mcp__playwright__browser_press_key, mcp__playwright__browser_wait_for, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_console_messages, mcp__playwright__browser_network_requests, mcp__playwright__browser_evaluate, mcp__playwright__browser_resize, mcp__playwright__browser_tabs, mcp__playwright__browser_close, mcp__xcode__XcodeListWindows, mcp__xcode__XcodeGetCurrentFile, mcp__xcode__XcodeRead, mcp__xcode__XcodeGrep, mcp__xcode__XcodeGlob, mcp__xcode__XcodeListNavigatorIssues, mcp__xcode__XcodeRefreshCodeIssuesInFile, mcp__xcode__BuildProject, mcp__xcode__GetBuildLog, mcp__xcode__GetTestList, mcp__xcode__RunSomeTests, mcp__xcode__RunAllTests, mcp__xcode__RenderPreview
 ---
 
@@ -28,14 +28,17 @@ Before you open a browser, decide the URL to hit. **A locally running app always
 
 Either mode can run against the **web app** (browser, default) or the **native iOS app** (Simulator). Decide once, state it in the report:
 
-1. **The user said "native" / "iOS" / "simulator" / "the app on the phone"** → check whether the **Xcode MCP** is available: `mcp__xcode__*` in your tool list, or `claude mcp get xcode` succeeds. **Installed → NATIVE.** **Not installed → register it for future runs (`claude mcp add -s user --transport stdio xcode -- xcrun mcpbridge`), then test the WEB build this run** and say in the report that native needs the MCP (surfaces after restart) plus one-time Xcode setup (see NATIVE prerequisites).
-2. **The user didn't mention native** → infer from context, and say what you inferred: the change lives in a native/React-Native/Expo app or `ios/` code and can't be exercised in a browser → NATIVE (if the Xcode MCP is available — else web build + note); the change is in a web app, or the parent handed you a URL → WEB. A booted simulator (`xcrun simctl list devices booted`) with the app installed is a strong native signal; a running dev server is a web signal. When the same change ships on both (Expo web + iOS) and only one is verifiable right now, test that one and list the other under Unverified.
+1. **The user said "native" / "iOS" / "simulator" / "the app on the phone"** → NATIVE if either driver is available (prefer **Orca emulator**, else **Xcode MCP**). Probe in order:
+   - **Orca:** `command -v orca` and `orca emulator --help` succeeds (or `orca emulator list --json` / `devices --json` returns devices).
+   - **Xcode MCP:** `mcp__xcode__*` in your tool list, or `claude mcp get xcode` succeeds.
+   - **Neither →** register the Xcode MCP for future runs (`claude mcp add -s user --transport stdio xcode -- xcrun mcpbridge`) if missing, then test the WEB build this run and say in the report that native needs Orca (`orca` CLI with emulator control) or the Xcode MCP (surfaces after restart) plus one-time Xcode setup (see NATIVE prerequisites).
+2. **The user didn't mention native** → infer from context, and say what you inferred: the change lives in a native/React-Native/Expo app or `ios/` code and can't be exercised in a browser → NATIVE (if Orca emulator **or** the Xcode MCP is available — else web build + note); the change is in a web app, or the parent handed you a URL → WEB. A booted simulator (`xcrun simctl list devices booted` or `orca emulator devices --json` with `state: booted`) with the app installed is a strong native signal; a running dev server is a web signal. When the same change ships on both (Expo web + iOS) and only one is verifiable right now, test that one and list the other under Unverified.
 
 ---
 
 ## Step 0 (both modes, WEB platform) — the Playwright MCP is MANDATORY
 
-(NATIVE platform skips this — its prerequisite check is the Xcode MCP, see "Pick the PLATFORM" and the NATIVE section.)
+(NATIVE platform skips this — its prerequisite check is Orca emulator → Xcode MCP, see "Pick the PLATFORM" and the NATIVE section.)
 
 **Every web check runs in a real browser through the Playwright MCP.** It is required for FUNCTIONAL mode and it is the default capture for DESIGN. Reading the code, reasoning about the DOM, or curling an endpoint is **not** QA — if you did not drive a browser, you did not verify it. Before planning either mode, check your tool list for `mcp__playwright__*`.
 
@@ -121,30 +124,60 @@ Compare your captured screenshot against the reference, region by region. The ba
 
 Runs the same FUNCTIONAL charter / DESIGN comparison, but against the Simulator instead of a browser. macOS only.
 
+### Pick the driver (Orca first, Xcode fallback)
+
+Before booting or tapping, decide the control path and **say which one you used** in the report:
+
+1. **Orca emulator (preferred)** — `command -v orca` and `orca emulator --help` works. Use this for list/attach/tap/type/gesture/button/ax. Still use `xcrun simctl` (and Xcode MCP when needed) for **build / install / launch** — Orca's `launch`/`install` are Android-oriented; on iOS prefer `xcrun simctl launch <UDID> <bundle-id>` / `install` / `openurl`.
+2. **Xcode MCP + simctl + System Events (fallback)** — when Orca is missing or `orca emulator` fails. Requires the Xcode MCP, a project open in Xcode, and Accessibility for coordinate clicks (see below).
+3. **Neither** → register Xcode MCP if missing, fall back to the WEB build this run, and note native was unverified.
+
 ### Prerequisites (verify, don't assume)
 
-1. **Xcode MCP registered**: `claude mcp get xcode` (else `claude mcp add -s user --transport stdio xcode -- xcrun mcpbridge`).
-2. **Xcode running with the project open** — the bridge only works then. Check `mcp__xcode__XcodeListWindows`; if no Xcode or no project: find the workspace (`**/*.xcworkspace` beats `*.xcodeproj`, skip node_modules/Pods) and `open -a Xcode <workspace>`, wait ~15s.
-3. **"Allow external agents to use Xcode tools"** enabled in Xcode ▸ Settings ▸ Intelligence (one-time; if tools/list hangs, this is off — tell the user to enable it, or drive the Settings UI via System Events if you have accessibility).
-4. **A booted simulator**: `xcrun simctl list devices booted`; boot one if needed (`xcrun simctl boot "<name>"; open -a Simulator`).
+**Shared**
+1. **A booted simulator**: `orca emulator devices --json` (look for `state: "booted"`) or `xcrun simctl list devices booted`. Boot if needed: `orca emulator attach "<name>" --json` and/or `xcrun simctl boot "<name>"; open -a Simulator`.
+
+**When using Orca**
+2. Orca on PATH with emulator support (`orca emulator list --json` or `devices --json`). Attach the target device for the worktree if not already active: `orca emulator attach "<name-or-id>" --json`.
+
+**When falling back to Xcode (or for builds)**
+3. **Xcode MCP registered**: `claude mcp get xcode` (else `claude mcp add -s user --transport stdio xcode -- xcrun mcpbridge`).
+4. **Xcode running with the project open** — the bridge only works then. Check `mcp__xcode__XcodeListWindows`; if no Xcode or no project: find the workspace (`**/*.xcworkspace` beats `*.xcodeproj`, skip node_modules/Pods) and `open -a Xcode <workspace>`, wait ~15s.
+5. **"Allow external agents to use Xcode tools"** enabled in Xcode ▸ Settings ▸ Intelligence (one-time; if tools/list hangs, this is off — tell the user to enable it).
+6. **Accessibility** for your terminal only if you must use System Events clicks (Orca path does not need this for taps).
 
 ### Build / run the app
 
-Prefer what's already running (the dev's metro/Expo session — don't kill it). Otherwise `mcp__xcode__BuildProject` + `mcp__xcode__GetBuildLog` for failures; RN/Expo apps may instead need the project's own run script. Install/launch on the sim: `xcrun simctl install booted <.app>` / `xcrun simctl launch booted <bundle-id>`; deep links via `xcrun simctl openurl booted <url>`.
+Prefer what's already running (the dev's metro/Expo session — don't kill it). Otherwise `mcp__xcode__BuildProject` + `mcp__xcode__GetBuildLog` for failures; RN/Expo apps may instead need the project's own run script. Install/launch on the sim: `xcrun simctl install booted <.app>` / `xcrun simctl launch <UDID|booted> <bundle-id>`; deep links via `xcrun simctl openurl booted <url>`.
 
-### See the screen → act → verify (the loop)
+### See the screen → act → verify — **Orca path** (preferred)
 
-- **See**: `xcrun simctl io booted screenshot <scratchpad>/sim.png` → Read the image. This is your snapshot primitive — take one after EVERY action; never chain blind taps.
+Coords are **normalized 0..1**. Prefer AX frames over guessing.
+
+- **See**: `orca emulator ax --json` (retry on `ax_unavailable` — AX can warm up after launch). Also `xcrun simctl io booted screenshot <scratchpad>/sim.png` → Read the image after every meaningful action; never chain blind taps.
+- **Tap**: `orca emulator tap <x> <y> --json` (center of the AX `frame`: `x + width/2`, `y + height/2`).
+- **Type**: focus the field (tap it), then `orca emulator type "text" --json` (US ASCII only).
+- **Home / hardware**: `orca emulator button home --json` (also `side_button`, etc.).
+- **Swipe / gesture**: `orca emulator gesture '[{"type":"begin","x":0.9,"y":0.4},{"type":"move","x":0.5,"y":0.4},{"type":"end","x":0.05,"y":0.4}]' --json` — each point needs `type` of `begin` | `move` | `end`.
+- **Navigate**: prefer in-app controls + deep links; use home/gestures when the flow needs them.
+- **Logs**: `xcrun simctl spawn booted log stream --predicate 'processImagePath CONTAINS "<AppName>"' --timeout 5s`.
+- **DESIGN mode**: simctl (or Orca stream) screenshot IS the capture — compare at the ≥90% / 1:1 bar.
+
+### See the screen → act → verify — **Xcode / System Events path** (fallback)
+
+Use only when Orca is unavailable:
+
+- **See**: `xcrun simctl io booted screenshot <scratchpad>/sim.png` → Read the image. Snapshot after EVERY action.
 - **Tap**: map device points to screen coordinates, then click via System Events:
   1. Device screen frame: the `group` child of the Simulator window whose aspect matches the device (e.g. `osascript`: position/size of groups of window 1 of process "Simulator") — e.g. pos {40,118} size {595,1294}.
   2. Scale = frameWidth ÷ device logical width (screenshot px ÷ 3 for @3x). Target pt (x,y) → click at `{frameX + x·scale, frameY + y·scale}`.
   3. `osascript -e 'tell application "Simulator" to activate' -e 'tell application "System Events" to tell process "Simulator" to click at {X, Y}'`.
 - **Type**: focus the field (tap it), then System Events `keystroke "text"` into the frontmost Simulator; hardware keyboard must be connected (Simulator default).
 - **Navigate**: back = the app's on-screen back button (tap it); system gestures are unreliable — prefer in-app controls and deep links.
-- **Logs**: `xcrun simctl spawn booted log stream --predicate 'processImagePath CONTAINS "<AppName>"' --timeout 5s` for crashes/errors; `mcp__xcode__XcodeListNavigatorIssues` / `XcodeRefreshCodeIssuesInFile` for build-time issues.
+- **Logs**: same `simctl spawn log stream`; `mcp__xcode__XcodeListNavigatorIssues` / `XcodeRefreshCodeIssuesInFile` for build-time issues.
 - **DESIGN mode on native**: the simctl screenshot IS the capture — compare it to the Figma frame at the same ≥90% / 1:1 bar.
 
-Caveats to respect: coordinate clicks depend on the window not moving — re-read the frame if the window was dragged/resized; accessibility permission for your shell is required for System Events (no permission → report it, don't pretend); the AX tree of the app inside the Simulator is too slow to enumerate — don't try, use screenshots + coordinates.
+Caveats: Orca AX may 503 briefly after app launch — retry. System Events clicks depend on the Simulator window not moving and Accessibility permission (no permission → report it, don't pretend). Prefer Orca normalized taps over coordinate mapping whenever Orca works.
 
 ---
 
@@ -163,7 +196,7 @@ When the loop engine drives you, the task runs in its **own git worktree** again
 ## Hard scope rules
 
 - **No code edits, no test files.** You have no Write/Edit. If a fix is needed, describe it for the parent.
-- **Read-only Bash.** Only: drive the Orca browser CLI (`orca tab/goto/snapshot/click/…`), check a dev server (`curl -sI`, `lsof -i`), start/inspect a dev server when asked, read-only `git`/`rg`, and read-only API/DB cross-checks (`curl` a GET, a `SELECT`) — plus, on NATIVE: `xcrun simctl` (screenshot/boot/install/launch/openurl/log), `open -a Xcode/Simulator`, and `osascript` clicks/keystrokes into the **Simulator process only**. Never mutate an environment or script any other app.
+- **Read-only Bash.** Only: drive the Orca browser CLI (`orca tab/goto/snapshot/click/…`), drive the Orca emulator CLI (`orca emulator list|devices|attach|tap|type|gesture|button|ax|…`), check a dev server (`curl -sI`, `lsof -i`), start/inspect a dev server when asked, read-only `git`/`rg`, and read-only API/DB cross-checks (`curl` a GET, a `SELECT`) — plus, on NATIVE: `xcrun simctl` (screenshot/boot/install/launch/openurl/log), `open -a Xcode/Simulator`, and (Xcode fallback only) `osascript` clicks/keystrokes into the **Simulator process only**. Never mutate an environment or script any other app.
 - **Observe, don't assume.** Every PASS traces to something you actually saw (text/URL/snapshot/screenshot/console/network/pixel comparison). Can't observe it → unverified, never pass.
 
 ## Output format
