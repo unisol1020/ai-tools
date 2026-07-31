@@ -1,4 +1,4 @@
-# claude-tickets
+# ai-tickets
 
 A Claude Code skill that turns a request — or a chunk of the conversation you're already in — into a Linear or Jira ticket that reads like a person wrote it. Short, specific, scannable. No wall of bullets, no "comprehensive solution to streamline the workflow". You ask in plain words; the skill figures out the tracker, mines the chat for the actual problem, pulls in design and error context from whatever MCPs you have connected, shows you the draft, and files it.
 
@@ -43,15 +43,15 @@ You don't run anything by hand. Paste this file (or its URL) into Claude Code an
 > 1. **Preflight.** Confirm `git` and the `claude` CLI are on PATH. If missing, stop and tell the user to install them.
 > 2. **Clone (idempotent):**
 >    ```bash
->    git clone https://github.com/unisol1020/claude-tools.git ~/.claude-tools 2>/dev/null \
->      || git -C ~/.claude-tools pull --ff-only
+>    git clone https://github.com/unisol1020/ai-tools.git ~/.ai-tools 2>/dev/null \
+>      || git -C ~/.ai-tools pull --ff-only
 >    ```
 > 3. **Run the installer:**
 >    ```bash
->    bash ~/.claude-tools/tickets/install.sh
+>    bash ~/.ai-tools/tickets/install.sh
 >    ```
 >    It symlinks the `ticket` skill into `~/.claude/skills/` and checks whether a Linear or Atlassian (Jira) MCP is connected.
-> 4. **Verify:** `ls -la ~/.claude/skills/ticket` is a symlink into `~/.claude-tools/tickets`.
+> 4. **Verify:** `ls -la ~/.claude/skills/ticket` is a symlink into `~/.ai-tools/tickets`.
 > 5. **Report back to the user** — confirm it's installed, then explain briefly (paraphrase, keep it short):
 >
 >    > ✅ **Installed.** Restart Claude Code once so the skill loads.
@@ -65,13 +65,13 @@ You don't run anything by hand. Paste this file (or its URL) into Claude Code an
 >    >
 >    > Try: *"create a ticket for the bug we just found"*.
 >
-> Update later with `git -C ~/.claude-tools pull` (the symlink picks it up). Uninstall: see the bottom of this file.
+> Update later with `git -C ~/.ai-tools pull` (the symlink picks it up). Uninstall: see the bottom of this file.
 
 ### Manual install (if you'd rather)
 
 ```bash
-git clone https://github.com/unisol1020/claude-tools.git ~/.claude-tools
-~/.claude-tools/tickets/install.sh
+git clone https://github.com/unisol1020/ai-tools.git ~/.ai-tools
+~/.ai-tools/tickets/install.sh
 ```
 Then restart Claude Code.
 
@@ -122,5 +122,5 @@ To make this global skill **stand down** in a repo that has its own ticket workf
 
 ```bash
 rm ~/.claude/skills/ticket
-rm -rf ~/.claude-tools   # only if nothing else in this repo is installed
+rm -rf ~/.ai-tools   # only if nothing else in this repo is installed
 ```

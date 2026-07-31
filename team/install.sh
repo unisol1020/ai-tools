@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# claude-team installer — symlinks the crew of planner / engineer / reviewer / tester
+# ai-team installer — symlinks the crew of planner / engineer / reviewer / tester
 # agents into ~/.claude/agents so they're available in every local project.
 # Re-runnable; symlinks mean `git pull` updates everything automatically.
 #
 # NOT installed here (they live with their own tools, on purpose):
 #   • manual-qa  → in qa/    (install qa/)
-#   • devops     → in loop/  (install loop/)
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,7 +15,7 @@ mkdir -p "$CLAUDE_DIR/agents"
 # rm the target first: ln -sfn nests a link *inside* a pre-existing real directory
 link() { rm -rf "$2"; ln -s "$1" "$2"; echo "  linked $(basename "$2")"; }
 
-echo "Installing claude-team into $CLAUDE_DIR ..."
+echo "Installing ai-team into $CLAUDE_DIR ..."
 for a in "$DIR"/agents/*.md; do
   link "$a" "$CLAUDE_DIR/agents/$(basename "$a")"
 done
@@ -41,8 +40,8 @@ It's NOT bundled here — install it locally once, then restart:
 If present, the architect routes its Phase-1 questioning through it; if absent, it builds the
 question list itself. grill-me runs a /grilling session, so both skills come with it.
 
-Pairs with the rest of claude-tools: the loop/ engine and the architect's babysit protocol
-dispatch exactly these agents (plan → implement → test → review), and qa/ adds manual-qa.
+Pairs with the rest of ai-tools: the architect's babysit protocol
+dispatches exactly these agents (plan → implement → test → review), and qa/ adds manual-qa.
 
 Requirements: Claude Code. Individual agents use whatever MCPs are connected (Supabase,
 Playwright, trackers, Figma, …) — none are required to install.

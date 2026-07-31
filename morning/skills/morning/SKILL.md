@@ -20,7 +20,7 @@ State lives in `~/.claude/morning.local.json` (machine-level, since "my repos" a
 }
 ```
 
-Tracker (Linear/Jira) + team/project are **not** stored here — reuse the `ticket` skill's `<repo>/.claude/tickets.local.json`, or detect the connected tracker MCP and ask once (the same gate `ticket`/`investigator` use).
+Tracker (Linear/Jira) + team/project are **not** stored here — reuse the `ticket` skill's `<repo>/.claude/tickets.local.json`, or detect the connected tracker MCP and ask once (the same gate `ticket` uses).
 
 ## Use any MCP you can see
 Discover what's connected **this session** (`claude mcp list` + this session's deferred-tool list) and load schemas with **ToolSearch** before calling. Each section uses what's there and **skips with a one-line note** if its MCP is absent — never block the whole briefing on one missing integration:
@@ -34,7 +34,7 @@ Discover what's connected **this session** (`claude mcp list` + this session's d
 
 2. **Section A — PRs to review.** For each configured repo, `gh pr list --repo <r> --state open --search "<prFilter>" --json number,title,author,url,latestReviews`, then **drop any PR you've already approved** — GitHub search has no `approved-by` qualifier, so cut them client-side: `--jq '[.[] | select((.latestReviews // []) | any(.author.login == "<me>" and .state == "APPROVED") | not)]'`. These are the PRs still *awaiting your review* (default: open, not authored by you, not yet approved by you). A PR you approved and that was then pushed to still reads as approved here and stays dropped until you re-review — that's intended for a morning glance. For each, run the **review-prs** skill to analyze the PR — it scopes the CLAUDE.md rules to the changed paths, cross-checks the linked ticket, and finds logic/quality issues, reusing the reviewer agents. Its confirm gate already holds every comment, so **nothing is posted from the briefing** — surface a one-line verdict per PR (looks good / N blocking / nits) with the top issue, then list the PRs that have findings and offer "post the review comments?" rather than posting silently. Many PRs → review the highest-traffic / oldest-waiting first and say how many you covered.
 
-3. **Section B — My tickets, logically sorted.** Pull issues **assigned to me** in an actionable state (Todo / In Progress / current cycle or sprint; skip Done/Canceled) via the tracker. For each, capture: project, priority, estimate/points if set, due date, and a **one-line plain-English "what it is"** (from the title + first lines of the description — not a paste). Then **sort and group** (see the sort model below) and present as a grouped checklist with dimension chips so the user can see urgency, effort, and size at a glance. Offer to hand any picked ticket to the **investigator** / `loop-engine` to actually run — don't start anything unprompted.
+3. **Section B — My tickets, logically sorted.** Pull issues **assigned to me** in an actionable state (Todo / In Progress / current cycle or sprint; skip Done/Canceled) via the tracker. For each, capture: project, priority, estimate/points if set, due date, and a **one-line plain-English "what it is"** (from the title + first lines of the description — not a paste). Then **sort and group** (see the sort model below) and present as a grouped checklist with dimension chips so the user can see urgency, effort, and size at a glance. Don't start implementing anything unprompted.
 
 4. **Section C — Slack, compacted.** Using the Slack MCP:
    - **Mentions of me** — `slack_search_public_and_private` for the user's handle/`<@userId>` since ~last working day; read each in context (`slack_read_thread`) enough to summarize the ask.
@@ -42,7 +42,7 @@ Discover what's connected **this session** (`claude mcp list` + this session's d
    - **Unread digest** — for the watched channels, a compact summary of unread: who needs what, decisions made, threads worth opening. Don't transcribe — summarize.
    - Sort the same way as tickets (most-urgent / needs-a-reply-from-me first), each as one line: who · channel/DM · the ask · link.
 
-5. **Assemble the briefing, then humanize.** One scannable digest, three sections, urgent-first within each. Keep it tight — this is a glance-and-go, not a report. End with a short **"do first"** suggestion (the 1–3 highest-leverage items across all three) and the open offers (post the PR comments? run a ticket in the loop?). If a section's MCP wasn't connected, show the section header with a one-line "not connected — skipped" so the user knows it wasn't forgotten. **Run the assembled prose** (the section summaries and the Slack/ticket one-liners — not the chips, links, or ids) **through the `humanizer` skill** so it reads like notes you'd jot for yourself, not an AI digest. (PR comments are already humanized inside review-prs.)
+5. **Assemble the briefing, then humanize.** One scannable digest, three sections, urgent-first within each. Keep it tight — this is a glance-and-go, not a report. End with a short **"do first"** suggestion (the 1–3 highest-leverage items across all three) and the open offers (post the PR comments?). If a section's MCP wasn't connected, show the section header with a one-line "not connected — skipped" so the user knows it wasn't forgotten. **Run the assembled prose** (the section summaries and the Slack/ticket one-liners — not the chips, links, or ids) **through the `humanizer` skill** so it reads like notes you'd jot for yourself, not an AI digest. (PR comments are already humanized inside review-prs.)
 
 ```
 ☀️  Morning — Mon Jun 29
@@ -60,7 +60,7 @@ YOUR TICKETS (6 assigned)
  Billing
   - [ ] ENG-151  Investigate webhook retry spikes     🟠 High   · ~M · research
   - [ ] ENG-160  Rename invoice fields                ⚪ Low    · ~S · quick win
-  → run any of these in the loop? (hands it to the investigator)
+  → pick any to work next?
 
 SLACK (4 need you)
   • alice  #eng    "can you review #214 today?"            → thread
@@ -85,4 +85,4 @@ Rank so the user sees the shape of the day, not just a flat list:
 - **Compact over complete.** Summarize Slack and ticket descriptions to one line each; the user opens the link for detail. A morning briefing that takes five minutes to read defeats the purpose.
 - **Humanize the prose.** The assembled briefing runs through the `humanizer` skill (step 5) so it reads human, not AI-generated — prose only; ids, links, and chips stay verbatim. PR comments are humanized within review-prs.
 - **Nothing silently dropped.** If you cap PRs reviewed or unread channels summarized, say how many you covered and what's left.
-- **Reuse the pieces.** PR review = `review-prs`; running a ticket = `investigator` / `loop-engine`; tracker mapping = the `ticket` skill's config. You orchestrate and sort; you don't reimplement any of them.
+- **Reuse the pieces.** PR review = `review-prs`; tracker mapping = the `ticket` skill's config. You orchestrate and sort; you don't reimplement any of them.

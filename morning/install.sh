@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-morning installer — symlinks the `morning` and `review-prs` skills into
+# ai-morning installer — symlinks the `morning` and `review-prs` skills into
 # ~/.claude/skills so the morning briefing + PR review work in every project.
 # Re-runnable; the symlinks mean `git pull` updates them automatically.
 set -euo pipefail
@@ -12,7 +12,7 @@ mkdir -p "$CLAUDE_DIR/skills"
 # rm the target first: ln -sfn nests a link *inside* a pre-existing real directory
 link() { rm -rf "$2"; ln -s "$1" "$2"; echo "  linked $(basename "$2")"; }
 
-echo "Installing claude-morning into $CLAUDE_DIR ..."
+echo "Installing ai-morning into $CLAUDE_DIR ..."
 link "$DIR/skills/morning"    "$CLAUDE_DIR/skills/morning"
 link "$DIR/skills/review-prs" "$CLAUDE_DIR/skills/review-prs"
 

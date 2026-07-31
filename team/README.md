@@ -1,12 +1,8 @@
-# claude-team
+# ai-team
 
-The **crew of subagents** Claude Code delegates real work to — the ones that plan, build, review, and test. They install into `~/.claude/agents` and work in every local project. Claude picks the right one automatically (or you name it), and the `loop` engine + the architect's babysit protocol dispatch exactly this crew to take a change from plan → code → tests → review.
+The **crew of subagents** Claude Code delegates real work to — the ones that plan, build, review, and test. They install into `~/.claude/agents` and work in every local project. Claude picks the right one automatically (or you name it), and the architect's babysit protocol dispatches this crew to take a change from plan → code → tests → review.
 
-Two members of the crew live with their own tools on purpose and are **not** installed here:
-- **`manual-qa`** ships in [`qa/`](../qa/README.md) — it needs the Playwright MCP and the `qa-run` skill.
-- **`devops`** ships in [`loop/`](../loop/README.md) — it stands up the loop's per-task Docker stacks.
-
-Install those tools to get those agents.
+**`manual-qa`** ships in [`qa/`](../qa/README.md) on purpose — it needs the Playwright MCP and the `qa-run` skill. Install `qa/` to get that agent.
 
 ## The crew
 
@@ -20,7 +16,7 @@ Install those tools to get those agents.
 | `frontend-reviewer` | Reviews frontend/UI changes — cited, prioritized findings. | report only |
 | `security-reviewer` | Security review of a diff before merge (authn/z, input, data, secrets, uploads, redirects, webhooks, …). | report only |
 
-The split is deliberate: engineers write code but not tests; the test-author writes tests but not code; reviewers only report. That separation is what lets the `loop` and `architect` chain them safely.
+The split is deliberate: engineers write code but not tests; the test-author writes tests but not code; reviewers only report. That separation is what lets the `architect` chain them safely.
 
 ## Install — just send this README to Claude Code
 
@@ -31,24 +27,24 @@ You don't run anything. Paste this file (or its URL) into **Claude Code** and sa
 > 1. **Preflight.** Confirm `git` and the `claude` CLI are on PATH. If either is missing, stop and tell the user to install it first.
 > 2. **Clone (idempotent):**
 >    ```bash
->    git clone https://github.com/unisol1020/claude-tools.git ~/.claude-tools 2>/dev/null \
->      || git -C ~/.claude-tools pull --ff-only
+>    git clone https://github.com/unisol1020/ai-tools.git ~/.ai-tools 2>/dev/null \
+>      || git -C ~/.ai-tools pull --ff-only
 >    ```
 > 3. **Run the installer:**
 >    ```bash
->    bash ~/.claude-tools/team/install.sh
+>    bash ~/.ai-tools/team/install.sh
 >    ```
 >    It symlinks every agent in `team/agents/*.md` into `~/.claude/agents/`. Idempotent — symlinks mean a later `git pull` updates everything.
-> 4. **Verify:** `ls -la ~/.claude/agents/` shows `architect`, `backend-engineer`, `frontend-engineer`, `automation-qa`, `backend-reviewer`, `frontend-reviewer`, `security-reviewer` as symlinks into `~/.claude-tools/team`.
+> 4. **Verify:** `ls -la ~/.claude/agents/` shows `architect`, `backend-engineer`, `frontend-engineer`, `automation-qa`, `backend-reviewer`, `frontend-reviewer`, `security-reviewer` as symlinks into `~/.ai-tools/team`.
 > 5. **Report back to the user** — confirm it's installed, tell them to **restart Claude Code once** so the agents load, then note two things:
->    - The crew works on its own, but pairs with the rest of claude-tools: install `qa/` (adds `manual-qa` + the browser tools) and `loop/` (adds `devops` + the autonomous engine) to complete the plan→build→test→review→PR chain.
+>    - The crew works on its own, but pairs with the rest of ai-tools: install `qa/` (adds `manual-qa` + the browser tools) to complete the plan→build→test→review chain.
 >    - **For the architect's "grill" step:** if a **`grill-me`** skill is in the session's skill list, the architect's Phase 1 is REQUIRED to route through it — the architect hands its open points back to the parent and the parent runs grill-me against the user. Only when no grill-me exists does the architect build the question list itself. Install the recommended one (Matt Pocock's — see [The grill-me skill](#the-grill-me-skill-for-the-architect) below), then restart.
 
 ### Manual install (if you'd rather)
 
 ```bash
-git clone https://github.com/unisol1020/claude-tools.git ~/.claude-tools
-~/.claude-tools/team/install.sh
+git clone https://github.com/unisol1020/ai-tools.git ~/.ai-tools
+~/.ai-tools/team/install.sh
 ```
 Then restart Claude Code.
 
@@ -116,4 +112,4 @@ for a in architect backend-engineer frontend-engineer automation-qa backend-revi
   rm -f ~/.claude/agents/$a.md
 done
 ```
-(Leaves `manual-qa` and `devops` alone — those belong to `qa/` and `loop/`.)
+(Leaves `manual-qa` alone — that belongs to `qa/`.)

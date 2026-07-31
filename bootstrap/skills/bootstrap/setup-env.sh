@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Idempotent environment setup for the claude-tools stack. Installs + configures the
+# Idempotent environment setup for the ai-tools stack. Installs + configures the
 # extensions the projects here expect — ripgrep, CodeGraph (+ its MCP), graphify (+ its
 # skill), and the ponytail plugin — but ONLY the ones missing. Safe to re-run.
 #
@@ -12,7 +12,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 note() { printf '  %s\n' "$*"; }
 ts()   { date +%Y%m%d-%H%M%S; }
 
-echo "Setting up the claude-tools stack (installs only what's missing) ..."
+echo "Setting up the ai-tools stack (installs only what's missing) ..."
 
 # 1. ripgrep ----------------------------------------------------------------
 if have rg; then note "✓ ripgrep already installed"

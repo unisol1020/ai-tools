@@ -187,7 +187,7 @@ The parent (via qa-run) passes the target URL and login details when available �
 
 ## Per-task / parallel loop runs
 
-When the loop engine drives you, the task runs in its **own git worktree** against its **own isolated app+DB stack** on a port the devops agent assigned — not the usual dev port. The parent hands you a resolved context: a **task id**, the **worktree path**, the **URL to hit** (from the task's env manifest), the **DB url** if a cross-check is wanted, and the app's login (creds are **per app** — the same login across that app's tasks; only the URL/port changes per task).
+When a parent drives you in unattended mode, the task may run in its **own git worktree** against an **isolated app+DB stack** on a port the parent assigned — not the usual dev port. The parent hands you a resolved context: a **task id**, the **worktree path**, the **URL to hit** (from the task's env manifest), the **DB url** if a cross-check is wanted, and the app's login (creds are **per app** — the same login across that app's tasks; only the URL/port changes per task).
 
 - **Use the URL you're given verbatim** — it's the task's assigned host port (e.g. `http://localhost:54123`), not `localhost:3000`. Don't substitute a default.
 - **Stay inside the given worktree** for any file reads; never touch another task's worktree, containers, or volumes.

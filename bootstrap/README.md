@@ -58,18 +58,18 @@ The toolchain it installs:
 > 1. **Preflight.** Confirm `git`, `jq`, and the `claude` CLI are on PATH.
 > 2. **Clone (idempotent):**
 >    ```bash
->    git clone https://github.com/unisol1020/claude-tools.git ~/.claude-tools 2>/dev/null \
->      || git -C ~/.claude-tools pull --ff-only
+>    git clone https://github.com/unisol1020/ai-tools.git ~/.ai-tools 2>/dev/null \
+>      || git -C ~/.ai-tools pull --ff-only
 >    ```
 > 3. **Run the installer** (symlinks the `/bootstrap` skill + the nudge hook, wires the SessionStart hooks into `settings.json` — backs it up first):
 >    ```bash
->    bash ~/.claude-tools/bootstrap/install.sh
+>    bash ~/.ai-tools/bootstrap/install.sh
 >    ```
 >    Add `--with-deps` to also install the toolchain (ripgrep / CodeGraph / graphify / ponytail / claude-mem) right now. **Ask the user first** — it runs brew / npm / uv.
-> 4. **Verify:** `ls -la ~/.claude/skills/bootstrap` is a symlink into `~/.claude-tools/bootstrap`.
+> 4. **Verify:** `ls -la ~/.claude/skills/bootstrap` is a symlink into `~/.ai-tools/bootstrap`.
 > 5. **Report back:** tell the user to **restart Claude Code once**, then open any repo and run **`/bootstrap`** — it installs the required extensions if missing, builds the CodeGraph index, offers `/graphify`, and records the repo. The ponytail + claude-mem plugins and the CodeGraph MCP surface after the restart.
 >
-> Update later with `git -C ~/.claude-tools pull` — the symlink picks it up.
+> Update later with `git -C ~/.ai-tools pull` — the symlink picks it up.
 
 ### Requirements
 
@@ -78,8 +78,8 @@ macOS or Linux, [Claude Code](https://claude.com/claude-code), `git`, and `jq`. 
 ### Manual install
 
 ```bash
-git clone https://github.com/unisol1020/claude-tools.git ~/.claude-tools
-~/.claude-tools/bootstrap/install.sh          # add --with-deps to also install the toolchain now
+git clone https://github.com/unisol1020/ai-tools.git ~/.ai-tools
+~/.ai-tools/bootstrap/install.sh          # add --with-deps to also install the toolchain now
 ```
 
 Then restart Claude Code.

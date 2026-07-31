@@ -1,4 +1,4 @@
-# claude-morning
+# ai-morning
 
 Two Claude Code skills for the start of the day:
 
@@ -20,12 +20,11 @@ flowchart TD
     B --> C[Section C — Slack<br/>mentions, DMs, urgent, unread digest]
     C --> BRIEF[one scannable briefing<br/>+ 'do first' + held offers]
     BRIEF -.->|on your OK| POST[post PR comments]
-    BRIEF -.->|on your OK| LOOP[hand a ticket to investigator/loop]
 
     RPX["/review-prs (standalone)"] --> RP
 ```
 
-`review-prs` reuses your existing `frontend-reviewer` / `backend-reviewer` / `security-reviewer` agents (and the `code-review` skill) as the quality engine where they're installed, and adds the two things they don't do: the **CLAUDE.md-rule** pass scoped to each changed file's rule ancestry, and the **ticket-intent** cross-check. `morning` reuses `review-prs` for PRs, the `ticket` skill's saved tracker mapping for tickets, and can hand a chosen ticket to the **investigator** / `loop-engine` to actually run. Both run their final text through the **`humanizer`** skill before it's shown or posted, so PR comments and the briefing read like a person wrote them — prose only; `file:line`, ids, and links stay verbatim.
+`review-prs` reuses your existing `frontend-reviewer` / `backend-reviewer` / `security-reviewer` agents (and the `code-review` skill) as the quality engine where they're installed, and adds the two things they don't do: the **CLAUDE.md-rule** pass scoped to each changed file's rule ancestry, and the **ticket-intent** cross-check. `morning` reuses `review-prs` for PRs and the `ticket` skill's saved tracker mapping for tickets. Both run their final text through the **`humanizer`** skill before it's shown or posted, so PR comments and the briefing read like a person wrote them — prose only; `file:line`, ids, and links stay verbatim.
 
 ## What you get
 
@@ -44,15 +43,15 @@ You don't run anything by hand. Paste this file (or its URL) into Claude Code an
 > 1. **Preflight.** Confirm `git`, the `claude` CLI, and `gh` are on PATH. If `git`/`claude` are missing, stop and tell the user. If `gh` is missing, install it (`brew install gh`) and note they'll need `gh auth login`.
 > 2. **Clone (idempotent):**
 >    ```bash
->    git clone https://github.com/unisol1020/claude-tools.git ~/.claude-tools 2>/dev/null \
->      || git -C ~/.claude-tools pull --ff-only
+>    git clone https://github.com/unisol1020/ai-tools.git ~/.ai-tools 2>/dev/null \
+>      || git -C ~/.ai-tools pull --ff-only
 >    ```
 > 3. **Run the installer:**
 >    ```bash
->    bash ~/.claude-tools/morning/install.sh
+>    bash ~/.ai-tools/morning/install.sh
 >    ```
 >    It symlinks the `morning` and `review-prs` skills into `~/.claude/skills/` and checks for `gh`, a tracker (Linear/Jira), and a Slack MCP.
-> 4. **Verify:** `ls -la ~/.claude/skills/morning ~/.claude/skills/review-prs` are symlinks into `~/.claude-tools/morning`.
+> 4. **Verify:** `ls -la ~/.claude/skills/morning ~/.claude/skills/review-prs` are symlinks into `~/.ai-tools/morning`.
 > 5. **Report back to the user** — confirm it's installed, then explain briefly (paraphrase, keep it short):
 >
 >    > ✅ **Installed.** Restart Claude Code once so the skills load.
@@ -65,13 +64,13 @@ You don't run anything by hand. Paste this file (or its URL) into Claude Code an
 >    >
 >    > Try: *"do my morning routine"*.
 >
-> Update later with `git -C ~/.claude-tools pull` (the symlinks pick it up). Uninstall: see the bottom of this file.
+> Update later with `git -C ~/.ai-tools pull` (the symlinks pick it up). Uninstall: see the bottom of this file.
 
 ### Manual install (if you'd rather)
 
 ```bash
-git clone https://github.com/unisol1020/claude-tools.git ~/.claude-tools
-~/.claude-tools/morning/install.sh
+git clone https://github.com/unisol1020/ai-tools.git ~/.ai-tools
+~/.ai-tools/morning/install.sh
 ```
 Then restart Claude Code.
 
@@ -101,5 +100,5 @@ Repos, Slack channels, and the post mode live in `~/.claude/morning.local.json` 
 
 ```bash
 rm ~/.claude/skills/morning ~/.claude/skills/review-prs
-rm -rf ~/.claude-tools   # only if nothing else in this repo is installed
+rm -rf ~/.ai-tools   # only if nothing else in this repo is installed
 ```

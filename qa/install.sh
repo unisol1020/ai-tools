@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-qa installer — symlinks the global manual-qa agent + qa skills into ~/.claude
+# ai-qa installer — symlinks the global manual-qa agent + qa skills into ~/.claude
 # and registers the Playwright MCP (user scope) so QA works in every local project.
 # Re-runnable; symlinks mean `git pull` updates everything automatically.
 set -euo pipefail
@@ -12,7 +12,7 @@ mkdir -p "$CLAUDE_DIR/agents" "$CLAUDE_DIR/skills"
 # rm the target first: ln -sfn nests a link *inside* a pre-existing real directory
 link() { rm -rf "$2"; ln -s "$1" "$2"; echo "  linked $(basename "$2")"; }
 
-echo "Installing claude-qa into $CLAUDE_DIR ..."
+echo "Installing ai-qa into $CLAUDE_DIR ..."
 link "$DIR/agents/manual-qa.md"      "$CLAUDE_DIR/agents/manual-qa.md"
 link "$DIR/skills/playwright-qa"     "$CLAUDE_DIR/skills/playwright-qa"
 link "$DIR/skills/qa-run"            "$CLAUDE_DIR/skills/qa-run"

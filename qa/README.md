@@ -1,4 +1,4 @@
-# claude-qa
+# ai-qa
 
 A QA agent for Claude Code that drives your running app — a **web app in a real browser** or a **native iOS app in the Simulator** — in any local project. You ask "does login work?", "does /pricing match this Figma?", or "test the native app in the simulator" in plain words; it opens the app, clicks through (or screenshots and compares), and reports PASS / FAIL with what it actually saw. It never writes tests and never edits your code.
 
@@ -41,7 +41,7 @@ flowchart TD
 
 The login ping is the one interactive escape hatch: if a flow needs a login but you declined credentials, `manual-qa` stops at the wall and emits `BLOCKED_AT_LOGIN` rather than guessing or faking a pass — `qa-run` then asks you whether to provide creds and re-runs.
 
-`qa-run` also has an **unattended task mode**: the loop-engine injects a per-task URL/port and worktree, and it skips every question and runs straight through.
+`qa-run` also has an **unattended task mode**: a parent orchestrator can inject a per-task URL/port and worktree, and it skips every question and runs straight through.
 
 ## What you get
 
@@ -61,15 +61,15 @@ You don't run anything. Paste this file (or its URL) into **Claude Code** and sa
 > 1. **Preflight.** Confirm `git`, `node`/`npx`, and the `claude` CLI are on PATH. If any is missing, stop and tell the user to install it first.
 > 2. **Clone (idempotent):**
 >    ```bash
->    git clone https://github.com/unisol1020/claude-tools.git ~/.claude-tools 2>/dev/null \
->      || git -C ~/.claude-tools pull --ff-only
+>    git clone https://github.com/unisol1020/ai-tools.git ~/.ai-tools 2>/dev/null \
+>      || git -C ~/.ai-tools pull --ff-only
 >    ```
 > 3. **Run the installer:**
 >    ```bash
->    bash ~/.claude-tools/qa/install.sh
+>    bash ~/.ai-tools/qa/install.sh
 >    ```
 >    It symlinks the `manual-qa` agent + `playwright-qa` and `qa-run` skills into `~/.claude/`, then registers the **Playwright MCP** at user scope (`claude mcp add -s user playwright -- npx @playwright/mcp@latest --headless`) and, on macOS with Xcode installed, the **Xcode MCP** for native iOS QA (`claude mcp add -s user --transport stdio xcode -- xcrun mcpbridge`). The install is idempotent — symlinks mean a later `git pull` updates everything, and an already-registered MCP is left alone.
-> 4. **Verify:** `claude mcp get playwright` shows *Connected* (and `claude mcp get xcode` on macOS); `ls -la ~/.claude/agents/manual-qa.md ~/.claude/skills/playwright-qa ~/.claude/skills/qa-run` are symlinks into `~/.claude-tools/qa`.
+> 4. **Verify:** `claude mcp get playwright` shows *Connected* (and `claude mcp get xcode` on macOS); `ls -la ~/.claude/agents/manual-qa.md ~/.claude/skills/playwright-qa ~/.claude/skills/qa-run` are symlinks into `~/.ai-tools/qa`.
 > 5. **Report back to the user** — confirm it's installed, then explain how it works in this simple step-by-step (paraphrase naturally, keep it short):
 >
 >    > ✅ **Installed.** Restart Claude Code once so the browser tools and the QA agent load.
@@ -88,13 +88,13 @@ You don't run anything. Paste this file (or its URL) into **Claude Code** and sa
 >    >
 >    > That's it. Try: *"QA the login flow"* or *"does the dashboard match this Figma: <link>"*.
 >
-> Update later with `git -C ~/.claude-tools pull` (symlinks pick it up). Uninstall: see the bottom of this file.
+> Update later with `git -C ~/.ai-tools pull` (symlinks pick it up). Uninstall: see the bottom of this file.
 
 ### Manual install (if you'd rather)
 
 ```bash
-git clone https://github.com/unisol1020/claude-tools.git ~/.claude-tools
-~/.claude-tools/qa/install.sh
+git clone https://github.com/unisol1020/ai-tools.git ~/.ai-tools
+~/.ai-tools/qa/install.sh
 ```
 Then restart Claude Code.
 
@@ -175,5 +175,5 @@ A project can ship its own `.claude/agents/manual-qa.md` to specialize the agent
 rm ~/.claude/agents/manual-qa.md ~/.claude/skills/playwright-qa ~/.claude/skills/qa-run
 claude mcp remove playwright -s user
 claude mcp remove xcode -s user   # only if you installed native iOS QA
-rm -rf ~/.claude-tools
+rm -rf ~/.ai-tools
 ```

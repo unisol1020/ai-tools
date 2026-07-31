@@ -1,6 +1,6 @@
 ---
 name: qa-run
-description: Orchestrate a manual-QA pass (functional or design) on the running app in ANY project — a WEB app in a browser or a NATIVE iOS app in the Simulator. Detects whether the project is a single app or a monorepo, remembers a dev URL and login credentials PER APP, plus an optional read-only DB, asking only for what isn't saved yet (and remembering "declined" so it never re-asks). Then scopes the run to the app(s) being tested and invokes the manual-qa agent. Use when the user asks to "QA this", "verify the app works", "test the flow", "check if X works / looks right in the browser", "test the native app / in the simulator", or invokes /qa-run. Runs in the MAIN thread (it needs to ask the user questions); it sets up context, then delegates the click-through to the manual-qa subagent. Also supports an unattended task mode where the loop-engine injects a per-task URL/port (or Simulator UDID) + worktree and no questions are asked.
+description: Orchestrate a manual-QA pass (functional or design) on the running app in ANY project — a WEB app in a browser or a NATIVE iOS app in the Simulator. Detects whether the project is a single app or a monorepo, remembers a dev URL and login credentials PER APP, plus an optional read-only DB, asking only for what isn't saved yet (and remembering "declined" so it never re-asks). Then scopes the run to the app(s) being tested and invokes the manual-qa agent. Use when the user asks to "QA this", "verify the app works", "test the flow", "check if X works / looks right in the browser", "test the native app / in the simulator", or invokes /qa-run. Runs in the MAIN thread (it needs to ask the user questions); it sets up context, then delegates the click-through to the manual-qa subagent. Also supports an unattended task mode where a parent injects a per-task URL/port (or Simulator UDID) + worktree and no questions are asked.
 ---
 
 # qa-run — per-project QA orchestrator
@@ -28,7 +28,7 @@ State lives in `<project-root>/.claude/qa.local.json`. URLs and credentials are 
 
 ## Task mode (unattended — driven by the loop engine)
 
-When the **loop-engine** invokes you for a parallel task run, it passes a resolved context and you **do not prompt the user** (the run is unattended). The context: `{ taskId, worktree, app, url, dbUrl? }` where `url` is the task's **isolated app port** from the devops/`task-env` manifest (e.g. `http://localhost:54123`), not the project's normal dev URL.
+When a **parent orchestrator** invokes you for an unattended task run, it passes a resolved context and you **do not prompt the user**. The context: `{ taskId, worktree, app, url, dbUrl? }` where `url` is the task's **isolated app port** from the env manifest (e.g. `http://localhost:54123`), not the project's normal dev URL.
 
 In task mode:
 - **Use the passed `url`** as the target — skip the URL gate entirely (don't ask, don't probe the default port). A **native** task passes a Simulator UDID (`SIM_UDID`) + Xcode project/scheme instead of a `url`; pass those straight through to `manual-qa` and run it in NATIVE platform mode.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-tickets installer — symlinks the global `ticket` skill into ~/.claude/skills
+# ai-tickets installer — symlinks the global `ticket` skill into ~/.claude/skills
 # so human-readable Linear/Jira ticket creation works in every project.
 # Re-runnable; the symlink means `git pull` updates it automatically.
 set -euo pipefail
@@ -12,7 +12,7 @@ mkdir -p "$CLAUDE_DIR/skills"
 # rm the target first: ln -sfn nests a link *inside* a pre-existing real directory
 link() { rm -rf "$2"; ln -s "$1" "$2"; echo "  linked $(basename "$2")"; }
 
-echo "Installing claude-tickets into $CLAUDE_DIR ..."
+echo "Installing ai-tickets into $CLAUDE_DIR ..."
 link "$DIR/skills/ticket" "$CLAUDE_DIR/skills/ticket"
 
 echo
