@@ -1,6 +1,6 @@
 ---
 name: playwright-qa
-description: Fast, headless functional browser testing for any local web app via the global Playwright MCP — click-through flows, form submit + assert, login-gated paths, forced API-error states, mobile-viewport / offline / geolocation checks, and trace evidence. Use when an agent needs to DRIVE a real browser to verify a web flow works (not unit/component tests). Prefer this over the cmux WKWebView browser for functional/repeatable testing; keep cmux for design/visual confirmation and Maestro for native mobile apps. Triggers: "test the flow", "click through", "verify in the browser", "headless e2e", "reproduce the bug in the UI", "check the error state", "test mobile viewport".
+description: Fast, headless functional browser testing for any local web app via the global Playwright MCP — click-through flows, form submit + assert, login-gated paths, forced API-error states, mobile-viewport / offline / geolocation checks, and trace evidence. This is the DEFAULT and required way to drive a real browser for web QA (not unit/component tests); the Orca browser CLI is the fallback when the MCP tools aren't loaded, and Maestro covers native mobile apps. Triggers: "test the flow", "click through", "verify in the browser", "headless e2e", "reproduce the bug in the UI", "check the error state", "test mobile viewport".
 ---
 
 # Playwright QA (headless, via Playwright MCP)
@@ -16,14 +16,14 @@ A global, reusable browser-driving tool for functional QA in **any** local proje
 | Need | Tool |
 |------|------|
 | Fast/repeatable **functional** click-through of a web app | **Playwright MCP** (this skill) |
-| Force an **API error / mock / block** a request (4xx/5xx/offline) | **Playwright MCP** — cmux can't |
-| **Mobile viewport / device / geolocation / offline** behavior | **Playwright MCP** — cmux can't |
+| Force an **API error / mock / block** a request (4xx/5xx/offline) | **Playwright MCP** |
+| **Mobile viewport / device / geolocation / offline** behavior | **Playwright MCP** |
 | Log in once, **reuse the session** across runs | **Playwright MCP** `storageState` |
-| **Design / visual** confirmation, real desktop rendering, a window a human watches | **cmux** WKWebView (macOS only) |
+| **Design / visual** confirmation, or the MCP tools aren't loaded this session | **Playwright MCP** screenshot; else the **Orca** browser CLI |
 | Native **mobile app** flow | **Maestro** (not a browser) |
 | Component render assertions (no real browser) | the project's unit runner |
 
-Why Playwright over cmux for functional: accessibility-tree snapshots with **stable refs** (no pixel guessing), **auto-waiting** (no flaky sleeps), **headless** (off the desktop, parallel, cross-platform/CI), and it does network/viewport/offline that cmux fundamentally cannot. Why keep cmux: its WebKit is a patched engine — non-macOS screenshots don't pixel-match real Safari, so **visual/design fidelity stays with cmux**.
+Why Playwright leads: accessibility-tree snapshots with **stable refs** (no pixel guessing), **auto-waiting** (no flaky sleeps), **headless** (off the desktop, parallel, cross-platform/CI), plus network/viewport/offline control. When its tools aren't in the list, drive **Orca** (`orca tab create --url`, `orca snapshot`, `orca click --element @e1`, `orca screenshot`, `orca set offline|device`, `orca storage local set`) — a real browser with an equivalent surface. Never fall back to reading code instead of driving a browser.
 
 ## The loop
 
@@ -38,7 +38,7 @@ Why Playwright over cmux for functional: accessibility-tree snapshots with **sta
 
 Selectors: target the app's existing **roles / labels / testIDs** rather than brittle CSS.
 
-## Capabilities cmux lacks (reach for these)
+## High-value capabilities (reach for these)
 
 - **Network control** — intercept/mock/abort requests to force error states, assert which requests fired, replay HAR.
 - **Emulation** — `browser_resize` / device profiles for mobile breakpoints; geolocation, offline, locale, color-scheme.

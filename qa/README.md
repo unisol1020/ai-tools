@@ -9,7 +9,7 @@ One agent, **two modes × two platforms**, both picked from how you ask:
 
 …and both modes run on either platform:
 
-- **Web** (default) — headless Chromium via the **Playwright MCP**; cmux / Claude Desktop for truest-fidelity design capture.
+- **Web** (default) — a real browser via the **Playwright MCP** (required); the **Orca** browser CLI or Claude Desktop as fallback capture.
 - **Native iOS** — the booted **Simulator**, driven through the **Xcode MCP** (`xcrun mcpbridge`) + `simctl` screenshots and coordinate-mapped taps. Say *"test the native app"* / *"on iOS"* / *"in the simulator"*; if you don't say it, the platform is inferred from where the change lives and what's running. macOS + Xcode only — with no Xcode MCP it registers it for next time and tests the web build this run.
 
 The first time you QA a project, it asks once for the app's URL, optional login, and an optional read-only DB — then remembers your answers per project (including "no, don't ask again") and stops nagging. A native run skips the URL question entirely — the Simulator is the target.
@@ -26,7 +26,7 @@ flowchart TD
     C -->|saved| E
     D --> E[invoke manual-qa subagent<br/>with resolved context]
     E --> P{platform — you said it,<br/>or inferred from the change}
-    P -->|web, default| W["WEB target:<br/>Playwright MCP browser<br/>(cmux / Desktop for design)"]
+    P -->|web, default| W["WEB target:<br/>Playwright MCP browser<br/>(Orca CLI as fallback)"]
     P -->|native iOS| N["NATIVE target:<br/>Xcode MCP + booted Simulator,<br/>simctl screenshots + taps"]
     W --> F{mode from the ask}
     N --> F
@@ -49,7 +49,7 @@ The login ping is the one interactive escape hatch: if a flow needs a login but 
 |-------|------|------|
 | `agents/manual-qa.md` | global agent | drives the browser **or the iOS Simulator** like a human QA; reports PASS/FAIL; no code edits, no test files |
 | `skills/qa-run/` | skill | orchestrator: gathers + remembers per-app URL/login + project DB, then invokes `manual-qa` |
-| `skills/playwright-qa/` | skill | the headless-browser playbook — the navigate→snapshot→act→assert loop and when to use it vs cmux |
+| `skills/playwright-qa/` | skill | the browser playbook — the navigate→snapshot→act→assert loop, network/viewport control, and the Orca fallback |
 | `templates/qa.local.json.example` | template | shape of the per-project memory file |
 
 ## Install — just send this README to Claude Code
@@ -84,7 +84,7 @@ You don't run anything. Paste this file (or its URL) into **Claude Code** and sa
 >    > 4. I then drive a **real browser** and report **PASS / FAIL** with exactly what I saw. For *works* checks I follow the flow, click, and watch for errors. For *looks-right* checks I screenshot the page and compare it to your Figma/screenshot at a **90%+ / 1:1** bar and list every difference.
 >    > 5. For a design check, **give me a Figma link or a screenshot** of the target — if you don't, I'll ask for one.
 >    > 6. Your logins live only in a local, git-ignored file (local-dev only) — never committed, never shown back to you.
->    > 7. 💡 For the best experience run me inside **cmux** (macOS) or the **Claude Desktop** app — both give a real browser/WebView so I see and screenshot the live UI at truest fidelity (great for design checks). A plain terminal is fine too; functional checks fall back to headless Playwright.
+>    > 7. 💡 I always verify in a **real browser** via the Playwright MCP — including the blast radius around your change and the edge cases a real user hits. If the MCP isn't loaded yet, I drive **Orca**'s browser instead; a plain terminal is fine either way.
 >    >
 >    > That's it. Try: *"QA the login flow"* or *"does the dashboard match this Figma: <link>"*.
 >
@@ -101,7 +101,7 @@ Then restart Claude Code.
 ## Requirements
 
 - [Claude Code](https://claude.com/claude-code), Node.js (for `npx`), git.
-- **Recommended runtime:** `cmux` (macOS) or the Claude Desktop app — both give a real browser/WebView, so the agent screenshots the live UI at truest fidelity (best for design checks). Both optional: functional QA needs only the Playwright MCP and runs in any terminal.
+- **Browser:** the Playwright MCP is required and runs in any terminal. If its tools aren't loaded in a session, the agent falls back to the **Orca** browser CLI (`orca tab create`, `orca snapshot`, `orca click`, `orca screenshot`) — still a real browser.
 - First Playwright run downloads Chromium once (~100MB), so the first `browser_navigate` is slow.
 - **Native iOS QA (optional):** macOS + Xcode 26+ (for `xcrun mcpbridge`), the Xcode MCP registered, "Allow external agents to use Xcode tools" enabled, and Accessibility permission for your terminal. Without any of it, web QA works exactly as before.
 
@@ -146,12 +146,12 @@ Your choices live in `<project>/.claude/qa.local.json` (see `templates/qa.local.
 
 | Tool | Used for |
 |------|----------|
-| **Playwright MCP** | web functional QA — flows, forms, forced error states (network mocking), mobile/offline/geo. The default; works everywhere. |
-| **cmux** (macOS, optional) | web design/visual capture in a real desktop WebView, for "does it look right". |
+| **Playwright MCP** | web QA in a real browser — flows, forms, forced error states (network mocking), mobile/offline/geo, screenshots. Required; works everywhere. |
+| **Orca** browser CLI (optional) | fallback real browser when the Playwright MCP tools aren't loaded — `orca tab create`, `orca snapshot`, `orca click`, `orca screenshot`, `orca set offline\|device`, `orca storage local set`. |
 | **Xcode MCP** (`xcrun mcpbridge`) + `simctl` | **native iOS QA** — build/launch on the booted Simulator, `simctl io screenshot` as the snapshot primitive, coordinate-mapped taps/keystrokes via System Events, `simctl spawn log stream` for crashes. macOS + Xcode 26+. |
 | **Maestro** | native **Android** / cross-platform flow scripting — not part of this toolset; use it directly. |
 
-For design mode on web, `manual-qa` captures the running UI with the first available of: cmux → Claude Desktop browser → Chrome-connected browser → headless Playwright screenshot → else it tells you to enable one. On native, the `simctl` screenshot *is* the capture, compared to the Figma frame at the same ≥90% / 1:1 bar.
+For design mode on web, `manual-qa` captures the running UI with the first available of: Playwright MCP screenshot → Orca browser CLI → Claude Desktop browser → Chrome-connected browser → else it tells you to enable one. On native, the `simctl` screenshot *is* the capture, compared to the Figma frame at the same ≥90% / 1:1 bar.
 
 ### Native iOS — one-time setup
 

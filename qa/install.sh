@@ -52,8 +52,9 @@ Done. Next:
      verify the DB — via a connected MCP (e.g. Supabase) or psql with a read-only DB URL you
      provide (local/dev). It remembers your choices per project, then runs the manual-qa agent.
 
-Requirements: Node.js (for npx) and Claude Code. cmux (optional, macOS) is only used for
-visual/design checks; functional QA needs only the Playwright MCP.
+Requirements: Node.js (for npx) and Claude Code. All web QA runs in a real browser via the
+Playwright MCP; if its tools aren't loaded in a session, the agent falls back to the Orca
+browser CLI (optional).
 
 Native iOS QA (optional, macOS + Xcode 26+): the installer registered the Xcode MCP
 (xcrun mcpbridge). Enable Xcode > Settings > Intelligence > "Allow external agents to use
