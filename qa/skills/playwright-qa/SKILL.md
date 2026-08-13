@@ -9,7 +9,8 @@ A global, reusable browser-driving tool for functional QA in **any** local proje
 
 - **Server:** `@playwright/mcp@latest --headless` (Microsoft, official), stdio, user scope. Install with `claude mcp add -s user playwright -- npx @playwright/mcp@latest --headless` (the repo's `install.sh` does this).
 - **Tools:** `mcp__playwright__browser_*`. They may be deferred — load schemas on demand with `ToolSearch` (e.g. `select:browser_navigate,browser_snapshot,browser_click,browser_type`). If they don't appear at all, the MCP was just added → **restart Claude Code once** to surface them.
-- **First run** downloads Chromium (one-time, ~100MB) — expect a short delay on the first `browser_navigate`.
+- **First run** downloads Chromium (one-time, ~100MB) — expect a short delay on the first `browser_navigate`. Pre-install it with `npx playwright install chromium` if you're about to need a browser in a hurry.
+- **The user wants to WATCH the run?** The MCP is headless by design and its flags are fixed once the server boots, so no MCP call can put a window on screen. Run a headed throwaway script from the scratchpad instead — `chromium.launch({ headless: false, slowMo: 250 })` — and keep the MCP for everything unattended. Full guidance in the `manual-qa` agent under "Headless by default — a VISIBLE browser when the user asks to watch".
 
 ## Pick the right tool
 

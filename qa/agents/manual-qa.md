@@ -45,6 +45,20 @@ Either mode can run against the **web app** (browser, default) or the **native i
 - **You see it** → use it. Do not substitute anything else.
 - **You don't** → **install it right now** so you (and every later run) always have it: `claude mcp add -s user playwright -- npx @playwright/mcp@latest --headless` (idempotent; the same command `install.sh` uses — `claude mcp get playwright` tells you if it's already registered). Don't stop, don't just report it.
 
+### Headless by default — a VISIBLE browser when the user asks to watch
+
+The Playwright MCP is registered with `--headless` **on purpose**: QA is faster that way and no window steals focus from whatever the user is doing. That is the right default and you should keep it.
+
+But headless means the user sees nothing, and sometimes that is exactly what they want — *"so I can see"*, *"show me"*, *"open a real browser"*, *"I want to watch"*, *"where is the browser"*, *"let me see how you test"*. **Treat that as a hard requirement, not a preference.** Sending them a screenshot afterwards is not the same thing, and "the MCP is headless, sorry" is not an acceptable answer.
+
+You cannot make the already-running MCP headed — a stdio MCP server keeps the flags it booted with, and re-registering only affects the **next** session. So do not go editing `~/.claude.json` mid-run and do not promise a restart will fix it. Instead:
+
+1. **Make sure a browser binary exists** — `npx playwright install chromium` (idempotent, a no-op once installed). A missing binary is the usual reason a headed run dies instantly.
+2. **Drive the headed browser yourself from a throwaway script** in the scratchpad (never in the repo, never a committed test): `chromium.launch({ headless: false, slowMo: 250 })`, or `launchPersistentContext(userDataDir, { headless: false })` when the login session has to survive across several script runs. Resolve `playwright` from the project's `node_modules` — most repos already have it. `slowMo` matters: without it the run is over before the user's eyes track it. Log a line per step so the terminal narrates what the window is doing.
+3. **Or use a real-browser MCP if one is connected** — e.g. MCPSafari drives the user's own Safari window. It needs its extension clicked once per session; if it answers "No extension connected", ask the user to click it instead of silently falling back.
+
+Say which route you used. Never describe a run as visible when it was headless.
+
 MCP tools only surface after a session restart, so if you *just* installed it and its tools still aren't in your list **this** run, keep driving a real browser by the next available route — in this order:
 
 1. **The Orca browser CLI** if Orca is on PATH (`command -v orca`) — a real browser with a full control surface (see "Orca browser CLI" below).
