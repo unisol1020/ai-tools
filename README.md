@@ -2,7 +2,7 @@
 
 My kit of **Claude Code** tools — agents, skills, and config that install into `~/.claude` and work in any local project. Each one is a top-level folder with its own README and a one-line installer. Take the whole set, or just the one you want, by sending a README to Claude Code and saying *"install this"*.
 
-The set has a shape: **bootstrap** gets a machine and a repo ready; **qa**, **tickets**, and **morning** are the everyday helpers; **team** is the crew of planner/engineer/reviewer/tester subagents the rest lean on.
+The set has a shape: **bootstrap** gets a machine and a repo ready; **worktree-graphs** keeps that setup working once you branch out into worktrees; **qa**, **tickets**, and **morning** are the everyday helpers; **team** is the crew of planner/engineer/reviewer/tester subagents the rest lean on.
 
 ## How the tools fit together
 
@@ -10,6 +10,7 @@ The set has a shape: **bootstrap** gets a machine and a repo ready; **qa**, **ti
 flowchart TD
   subgraph setup["Set up once"]
     BOOT["bootstrap — /bootstrap<br/>ready a repo + machine"]
+    WTG["worktree-graphs — graphs status<br/>keep code graphs alive in every worktree"]
   end
   CC["Claude Code, in any repo"]
   subgraph daily["Everyday, on demand"]
@@ -18,7 +19,8 @@ flowchart TD
     MORN["morning — PRs + tickets + Slack<br/>in one briefing"]
   end
   TEAM["team — crew of subagents:<br/>plan · build · review · test"]
-  BOOT --> CC
+  BOOT --> WTG
+  WTG --> CC
   CC --> QA
   CC --> TIX
   CC --> MORN
@@ -36,6 +38,7 @@ flowchart TD
 | [**tickets**](tickets/README.md) | A `ticket` skill that writes **human-readable** Linear / Jira tickets (not AI slop) — repro + how-to-verify + where the problem lives — pulls Figma/Sentry/Slack context from connected MCPs, and posts test results as a comment. | *"install this: https://github.com/unisol1020/ai-tools/blob/main/tickets/README.md"* |
 | [**morning**](morning/README.md) | A `morning` skill — *"do my morning routine"* / `/morning` — that triages the three things you wake up to into one scannable briefing: open PRs in your repos that aren't yours (reviewed against each project's `CLAUDE.md` + the linked ticket + logic/quality), your assigned Linear/Jira tickets sorted urgency-then-effort and grouped by project, and Slack mentions / DMs / unread. Ships a standalone **`review-prs`** skill too — *"review all PRs"* / *"review this PR: \<url\>"*. PR comments are held for your OK before anything posts. | *"install this: https://github.com/unisol1020/ai-tools/blob/main/morning/README.md"* |
 | [**team**](team/README.md) | The **crew of subagents** Claude Code delegates to — `architect` (plans), `backend-engineer` / `frontend-engineer` (build), `automation-qa` (writes tests), and `backend-reviewer` / `frontend-reviewer` / `security-reviewer` (review). Claude picks the right one automatically; the architect's babysit protocol dispatches this crew. (`manual-qa` lives in `qa/`.) | *"install this: https://github.com/unisol1020/ai-tools/blob/main/team/README.md"* |
+| [**worktree-graphs**](worktree-graphs/README.md) | `graphs status` — every git worktree gets a working **CodeGraph index + Graphify graph**, instead of silently falling back to grep. Worktrees are fresh checkouts, so both gitignored graphs are missing; this reflink-clones main's index (3 copies of a 251 MB db = 8 KB) and syncs the branch delta on the session that opens there. Also fixes graphify going stale after `git pull`. | *"install this: https://github.com/unisol1020/ai-tools/blob/main/worktree-graphs/README.md"* |
 
 Each tool's README has its own self-install block, so you can install them one at a time.
 

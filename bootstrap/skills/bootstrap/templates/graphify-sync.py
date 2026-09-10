@@ -29,9 +29,21 @@ def in_scope(f: str) -> bool:
     return f.endswith(CODE_EXTS) and not (set(f.split("/")) & EXCLUDE_SEGMENTS)
 
 
-def git_files(diff_filter: str) -> list[str]:
+SYNCED = Path("graphify-out/.synced-sha")
+
+
+def sync_base() -> str | None:
+    prev = SYNCED.read_text().strip() if SYNCED.exists() else ""
+    if prev and subprocess.run(["git", "cat-file", "-e", prev + "^{commit}"],
+                               capture_output=True).returncode == 0:
+        return prev
+    return "HEAD~1" if subprocess.run(
+        ["git", "rev-parse", "HEAD~1"], capture_output=True).returncode == 0 else None
+
+
+def git_files(diff_filter: str, base: str) -> list[str]:
     out = subprocess.run(
-        ["git", "diff", "--name-only", f"--diff-filter={diff_filter}", "HEAD~1", "HEAD"],
+        ["git", "diff", "--name-only", f"--diff-filter={diff_filter}", base, "HEAD"],
         capture_output=True, text=True,
     )
     if out.returncode != 0:
@@ -42,12 +54,16 @@ def git_files(diff_filter: str) -> list[str]:
 def main() -> int:
     if not GRAPH.exists():
         return 0
-    if subprocess.run(["git", "rev-parse", "HEAD~1"], capture_output=True).returncode != 0:
-        return 0  # initial commit, no diff base
+    base = sync_base()
+    if base is None:
+        return 0
 
-    changed = git_files("ACMR")
-    deleted = git_files("D")
+    head = subprocess.run(["git", "rev-parse", "HEAD"],
+                          capture_output=True, text=True).stdout.strip()
+    changed = git_files("ACMR", base)
+    deleted = git_files("D", base)
     if not changed and not deleted:
+        SYNCED.write_text(head)
         return 0
 
     import json
@@ -87,6 +103,8 @@ def main() -> int:
     to_json(G, communities, "graphify-out/graph.json")
     if G.number_of_nodes() <= 5000:
         to_html(G, communities, "graphify-out/graph.html", community_labels=labels or None)
+
+    SYNCED.write_text(head)
 
     print(f"synced: {len(changed)} changed, {len(deleted)} deleted -> "
           f"{G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
