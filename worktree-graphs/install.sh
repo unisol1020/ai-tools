@@ -15,9 +15,19 @@ echo "Installing worktree-graphs into $CLAUDE_DIR ..."
 link "$DIR/bin/graphs"              "$CLAUDE_DIR/bin/graphs"
 link "$DIR/skills/worktree-graphs"  "$CLAUDE_DIR/skills/worktree-graphs"
 
-for d in "$HOME/bin" "$HOME/.local/bin"; do
-  if [ -d "$d" ]; then ln -sfn "$DIR/bin/graphs" "$d/graphs"; echo "  put graphs on PATH via $d"; break; fi
+BINDIR=""
+for d in "$HOME/.local/bin" "$HOME/bin"; do
+  [ -d "$d" ] && { BINDIR="$d"; break; }
 done
+[ -n "$BINDIR" ] || { BINDIR="$HOME/.local/bin"; mkdir -p "$BINDIR"; }
+ln -sfn "$DIR/bin/graphs" "$BINDIR/graphs"
+echo "  put graphs in $BINDIR"
+case ":$PATH:" in
+  *":$BINDIR:"*) ;;
+  *) echo "  NOTE: $BINDIR is not on your PATH. Add this to your shell rc:"
+     echo "        export PATH=\"$BINDIR:\$PATH\""
+     echo "        (until then, use the full path: $BINDIR/graphs status)" ;;
+esac
 
 echo "Wiring the SessionStart hook ..."
 HOOK='d="${CLAUDE_PROJECT_DIR:-$PWD}"; g="$HOME/.claude/bin/graphs"; [ -x "$g" ] && (cd "$d" && nohup "$g" ensure >/dev/null 2>&1 &); true'
