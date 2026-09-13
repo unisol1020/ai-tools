@@ -166,7 +166,13 @@ bash ~/.claude/skills/bootstrap/mempalace-migrate.sh --remove-claude-mem   # ...
 | `--remove-claude-mem` | disable the plugin + stop its worker. **Database kept.** |
 | `--purge-claude-mem` | also `rm -rf ~/.claude-mem`. Irreversible — only after you trust recall. |
 | `--skip-mine` | export + hooks only. |
+| `--fresh` | rebuild the palace per-project. **Needed if an earlier run mined everything into one flat `claude_mem_export` wing** — the script detects that and refuses to stack on top of it. |
 | `--with-cloud` | also install the third-party cloud plugin (see below). |
+
+Everything claude-mem stored is covered: `observations` and `session_summaries` become the
+month-split markdown that gets mined, `user_prompts` are mined as their own `_prompts` wing, and
+`tool_uses` + `sdk_sessions` are dumped to JSON in the archive. Those last two live nowhere else —
+without them, deleting `~/.claude-mem` loses them for good.
 
 The export is a read-only SQLite→markdown transform — **no LLM calls, no cost**. Observations are
 split into one file per project per month on purpose: MemPalace skips any file over its

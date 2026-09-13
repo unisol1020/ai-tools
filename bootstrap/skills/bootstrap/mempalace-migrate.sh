@@ -4,16 +4,19 @@
 #   --purge-claude-mem    additionally delete ~/.claude-mem (IRREVERSIBLE)
 #   --with-cloud          also install the third-party MemPalace Cloud plugin (see README)
 #   --skip-mine           export + hooks only, don't ingest
+#   --fresh               rebuild the palace from scratch (needed if an earlier run
+#                         mined everything into one flat wing)
 set -uo pipefail
 
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REMOVE=0; PURGE=0; WITH_CLOUD=0; SKIP_MINE=0
+REMOVE=0; PURGE=0; WITH_CLOUD=0; SKIP_MINE=0; FRESH=0
 for a in "$@"; do case "$a" in
   --remove-claude-mem) REMOVE=1 ;;
   --purge-claude-mem)  REMOVE=1; PURGE=1 ;;
   --with-cloud)        WITH_CLOUD=1 ;;
   --skip-mine)         SKIP_MINE=1 ;;
+  --fresh)             FRESH=1 ;;
 esac; done
 
 note() { printf '  %s\n' "$*"; }
@@ -46,6 +49,22 @@ else note "· no claude-mem database found — nothing to export"; fi
 # Mining everything into a single wing makes `mempalace wake-up` return whichever
 # project it likes regardless of your cwd, so session-start injects the wrong
 # repo's memory. One wing per root project keeps recall scoped.
+# An earlier version of this script mined everything into one flat wing, which
+# makes `wake-up` ignore your cwd and inject some other repo's memory. Detect
+# that and rebuild rather than stacking per-wing copies on top of it.
+if [ "$SKIP_MINE" = 0 ] && mempalace status 2>/dev/null | grep -q "WING: claude_mem_export"; then
+  if [ "$FRESH" = 1 ]; then
+    PALACE_DIR="${MEMPALACE_PALACE:-$HOME/.mempalace/palace}"
+    mv "$PALACE_DIR" "$PALACE_DIR.flat-backup-$(ts)" 2>/dev/null \
+      && note "✓ old flat palace moved aside; rebuilding per-project"
+  else
+    note "⚠ this palace has a flat 'claude_mem_export' wing from an earlier migration."
+    note "⚠ session-start will inject the WRONG project's memory until it is rebuilt."
+    note "⚠ re-run with --fresh to rebuild per-project (the export is reused; only mining repeats)."
+    SKIP_MINE=1
+  fi
+fi
+
 if [ "$SKIP_MINE" = 0 ] && [ -d "$EXPORT_DIR/projects" ]; then
   note "→ dry run…"
   TOTAL_SKIP=0
@@ -124,7 +143,20 @@ else:
     print("  · claude-mem plugin was not enabled")
 PY
   fi
-  pkill -f 'claude-mem' 2>/dev/null && note "✓ claude-mem worker stopped"
+  # The worker re-parents to init and keeps a chroma/onnxruntime child tree
+  # alive, so a single pkill leaves an orphan burning memory. Sweep twice.
+  for _ in 1 2 3; do
+    pgrep -f 'claude-mem' >/dev/null 2>&1 || break
+    pkill -f 'thedotmack/claude-mem' 2>/dev/null
+    pkill -f 'claude-mem.*worker-service' 2>/dev/null
+    pkill -f 'chroma-mcp.*\.claude-mem' 2>/dev/null
+    sleep 2
+  done
+  if pgrep -f 'claude-mem' >/dev/null 2>&1; then
+    note "⚠ some claude-mem processes survived: $(pgrep -f 'claude-mem' | tr '\n' ' ')"
+  else
+    note "✓ claude-mem stopped (worker + chroma children)"
+  fi
   if [ "$PURGE" = 1 ]; then
     rm -rf "$HOME/.claude-mem" && note "✓ ~/.claude-mem deleted (export kept at $EXPORT_DIR)"
   else

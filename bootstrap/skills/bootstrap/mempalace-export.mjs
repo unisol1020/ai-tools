@@ -100,6 +100,34 @@ const prompts = q(`SELECT content_session_id,prompt_number,prompt_text,created_a
                    FROM user_prompts ORDER BY created_at_epoch ASC`);
 writeFileSync(join(ARCHIVE, 'user-prompts.jsonl'), prompts.map((p) => JSON.stringify(p)).join('\n') + '\n');
 
+// Prompts also go into the mined tree as their own wing; archived-only meant
+// everything you ever asked stayed unsearchable in the palace.
+const promptDir = join(OUT, 'projects', '_prompts');
+mkdirSync(promptDir, { recursive: true });
+const promptMonths = new Map();
+let promptDay = '';
+for (const pr of prompts) {
+  const month = (pr.created_at || 'unknown').slice(0, 7);
+  if (!promptMonths.has(month)) promptMonths.set(month, [`# Prompts — ${month}`, '']);
+  const md = promptMonths.get(month);
+  const d = (pr.created_at || '').slice(0, 10);
+  if (d !== promptDay) { promptDay = d; md.push('', `## ${d}`, ''); }
+  const text = (pr.prompt_text || '').trim();
+  if (text) md.push(`- ${text}`, '');
+}
+for (const [month, lines] of promptMonths) writeFileSync(join(promptDir, `${month}.md`), lines.join('\n'));
+
+// tool_uses and sdk_sessions live nowhere else. Without these, deleting
+// ~/.claude-mem loses them permanently. Dumped via the sqlite3 CLI because
+// tool_uses runs to hundreds of MB.
+for (const [table, file] of [['tool_uses', 'tool-uses.json'], ['sdk_sessions', 'sdk-sessions.json']]) {
+  try {
+    const json = execFileSync('sqlite3', ['-readonly', DB, '-cmd', '.mode json', `SELECT * FROM ${table}`],
+      { maxBuffer: 2 * 1024 * 1024 * 1024, encoding: 'utf8' });
+    writeFileSync(join(ARCHIVE, file), json || '[]');
+  } catch { console.warn(`  (could not archive ${table})`); }
+}
+
 writeFileSync(join(ARCHIVE, 'README.md'),
 `# claude-mem export
 
