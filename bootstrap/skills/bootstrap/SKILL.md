@@ -13,7 +13,8 @@ Run this to take a repo (and a fresh machine) from nothing to fully set up for t
 - **CodeGraph** — the `@colbymchenry/codegraph` CLI + its MCP server in Claude Code, then a built index of this repo.
 - **graphify** — the `graphifyy` PyPI package (provides the `graphify` CLI; Python 3.10+, installed via uv/pipx) + the `/graphify` skill, plus an optional **per-commit auto-sync** that keeps the graph fresh with zero tokens.
 - **ponytail** — the ponytail Claude Code plugin (lazy-senior-dev mode: YAGNI, stdlib-first, fewest lines).
-- **MemPalace** — the [MemPalace](https://github.com/MemPalace/mempalace) memory engine (`mempalace` PyPI package, installed via uv/pipx) + its MCP server. Persistent cross-session memory that stores verbatim text with **local embeddings — no API key, no per-session LLM call, no quota to exhaust**.
+- **MemPalace** — the [MemPalace](https://github.com/MemPalace/mempalace) memory engine (`mempalace` PyPI package, installed via uv/pipx) + its MCP server + its **automatic capture hooks** (`SessionStart` loads memory, `Stop`/`SessionEnd`/`PreCompact` save it). Stores verbatim text with **local embeddings — no API key, no per-session LLM call, no quota to exhaust**.
+  The hooks are the part that makes memory automatic. The MCP alone only exposes tools the model *may* call; without the hooks nothing is saved on its own.
 - **Standard code-comment policy** — writes the required `## Code Comments` rules (no comments by default; one-line `why` only) into the repo's `CLAUDE.md` and any existing `AGENTS.md` / `AGENT.md`, so every project enforces the same standard.
 
 Only what's missing is installed; re-running is safe.
@@ -51,9 +52,17 @@ Only what's missing is installed; re-running is safe.
    - **a. Stack note.** Create or update `$root/CLAUDE.md` with a short note that CodeGraph is indexed and should be reached for before grep/find on code questions (mirror the user's global convention), plus the detected stack. Don't duplicate a note that's already there.
    - **b. Standard Code Comments policy (always, by default).** Insert the canonical block from `~/.claude/skills/bootstrap/code-comments.md` **verbatim** into the repo's agent-instruction files. Targets: `$root/CLAUDE.md` (create it if missing) **and every existing** `CLAUDE.md` / `AGENTS.md` / `AGENT.md` already in the repo — root and nested (so a monorepo's per-app files get it too). Don't create new `AGENTS.md`/`AGENT.md` where none exists; only update the ones that are there. For each target: if it already has a `## Code Comments` section, **replace that whole section** with the canonical block (keeps the standard current as it evolves); otherwise **append** the block. Insert it exactly as written — it's a fixed standard, never paraphrase or adapt it per repo.
 
-8. **Record completion.** Append `root` as a new line to `~/.claude/.bootstrapped-projects` (create the file if missing; no duplicates). This stops the session-start nudge for this repo.
+8. **Migrate from claude-mem (only if `~/.claude-mem/claude-mem.db` exists).** Offer to run:
+   ```bash
+   bash ~/.claude/skills/bootstrap/mempalace-migrate.sh
+   ```
+   It exports every claude-mem observation to month-split markdown (read-only, **no LLM calls**), mines it into the palace, and wires the capture hooks. Add `--remove-claude-mem` to disable the old plugin afterwards (its database is kept), or `--purge-claude-mem` to delete `~/.claude-mem` outright — **only offer purge once the user confirms recall works**. `--with-cloud` additionally installs the third-party MemPalace Cloud plugin; do not add it by default (see the README note — it auto-saves to `api.mempalace.cloud`, not the local palace).
 
-9. **Report.** What was installed, whether the index built, whether graphify ran, whether the per-commit auto-sync was enabled, whether MemPalace was primed (and any files it skipped at the chunk cap), which files got the Code Comments policy (created vs updated), and: **restart Claude Code once** so the ponytail plugin + CodeGraph/MemPalace MCPs load.
+   **Ask before running** — mining is CPU-heavy. Relay the dry-run's skipped-file count if it reports one: files over the chunk cap are dropped **silently**, so an unreported skip means memories quietly did not migrate.
+
+9. **Record completion.** Append `root` as a new line to `~/.claude/.bootstrapped-projects` (create the file if missing; no duplicates). This stops the session-start nudge for this repo.
+
+10. **Report.** What was installed, whether the index built, whether graphify ran, whether the per-commit auto-sync was enabled, whether MemPalace was primed (and any files it skipped at the chunk cap), which files got the Code Comments policy (created vs updated), and: **restart Claude Code once** so the ponytail plugin + CodeGraph/MemPalace MCPs load.
 
 ## Rules
 

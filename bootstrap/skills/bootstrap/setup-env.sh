@@ -83,10 +83,38 @@ if have mempalace && have claude; then
   if claude mcp list 2>/dev/null | grep -q '^mempalace'; then
     note "✓ mempalace MCP already registered"
   else
-    claude mcp add mempalace -- mempalace-mcp >/dev/null 2>&1 \
-      && note "✓ mempalace MCP registered (available after restart)" \
-      || note "… run 'claude mcp add mempalace -- mempalace-mcp' manually"
+    claude mcp add --scope user mempalace -- mempalace-mcp >/dev/null 2>&1 \
+      && note "✓ mempalace MCP registered (user scope, available after restart)" \
+      || note "… run 'claude mcp add --scope user mempalace -- mempalace-mcp' manually"
   fi
+fi
+
+# MemPalace automatic capture: load on session start, save on stop/end/precompact.
+# Without these the MCP only exposes tools the model may call — nothing is saved
+# automatically, which is NOT how claude-mem behaved.
+if have mempalace && have python3; then
+  mkdir -p "$CLAUDE_DIR"; sj="$CLAUDE_DIR/settings.json"; [ -f "$sj" ] || echo '{}' > "$sj"
+  cp -p "$sj" "$sj.bak-$(ts)"
+  CLAUDE_SETTINGS="$sj" python3 - <<'PYHOOK'
+import json, os, collections
+p = os.environ['CLAUDE_SETTINGS']
+d = json.load(open(p), object_pairs_hook=collections.OrderedDict)
+hooks = d.setdefault('hooks', collections.OrderedDict())
+added = []
+for event, name in (('SessionStart','session-start'), ('Stop','stop'),
+                    ('SessionEnd','session-end'), ('PreCompact','precompact')):
+    groups = hooks.setdefault(event, [])
+    if any('mempalace' in str(h.get('command','')) for g in groups for h in g.get('hooks', [])):
+        continue
+    cmd = ('[ -x "$HOME/.local/bin/mempalace" ] && "$HOME/.local/bin/mempalace" '
+           f'hook run --hook {name} --harness claude-code || printf \'{{}}\\n\'')
+    groups.append(collections.OrderedDict([("hooks", [
+        collections.OrderedDict([("type", "command"), ("command", cmd)])])]))
+    added.append(event)
+json.dump(d, open(p, 'w'), indent=2)
+print("HOOKS:" + (",".join(added) if added else "already-present"))
+PYHOOK
+  note "✓ mempalace capture hooks wired (SessionStart/Stop/SessionEnd/PreCompact)"
 fi
 
 echo "Done. Restart Claude Code once so the ponytail plugin + CodeGraph/MemPalace MCP load."

@@ -112,3 +112,66 @@ If `/bootstrap` built a graphify graph, it offers a `PostToolUse` hook (written 
 rm ~/.claude/skills/bootstrap ~/.claude/hooks/bootstrap-check.sh
 # then remove the SessionStart entries for bootstrap-check.sh and the codegraph sync from ~/.claude/settings.json
 ```
+
+## Memory: MemPalace (and migrating off claude-mem)
+
+`setup-env.sh` installs [MemPalace](https://github.com/MemPalace/mempalace) (MIT), registers its MCP
+at user scope, and wires four capture hooks into `~/.claude/settings.json`:
+
+| Hook | Effect |
+|---|---|
+| `SessionStart` | loads relevant memory into the session |
+| `Stop` | saves after each turn |
+| `SessionEnd` | saves on close |
+| `PreCompact` | saves before context compaction |
+
+**The hooks are what make memory automatic.** The MCP on its own only exposes tools the model
+*may* call — without the hooks nothing is captured, which is not how claude-mem behaved.
+
+MemPalace stores verbatim text and embeds locally (`all-MiniLM-L6-v2`). No API key, no
+per-session model call, nothing to exhaust — which is why it replaced claude-mem here, whose
+observer needs an LLM call per session and fails closed when that allowance runs out.
+
+### Migrating an existing claude-mem database
+
+```bash
+bash ~/.claude/skills/bootstrap/mempalace-migrate.sh            # export + mine + hooks
+bash ~/.claude/skills/bootstrap/mempalace-migrate.sh --remove-claude-mem   # ...and retire the old plugin
+```
+
+| Flag | Effect |
+|---|---|
+| *(none)* | export → mine → wire hooks. claude-mem left running. |
+| `--remove-claude-mem` | disable the plugin + stop its worker. **Database kept.** |
+| `--purge-claude-mem` | also `rm -rf ~/.claude-mem`. Irreversible — only after you trust recall. |
+| `--skip-mine` | export + hooks only. |
+| `--with-cloud` | also install the third-party cloud plugin (see below). |
+
+The export is a read-only SQLite→markdown transform — **no LLM calls, no cost**. Observations are
+split into one file per project per month on purpose: MemPalace skips any file over its
+per-file chunk cap **silently**, so a single large project file will appear to import and won't.
+The migration script surfaces that count; don't ignore it.
+
+Your original transcripts in `~/.claude/projects/` are the higher-fidelity source — claude-mem's
+observations are LLM summaries *of* them. To file those verbatim instead:
+
+```bash
+mempalace mine ~/.claude/projects/<project-dir> --mode convos
+```
+
+### A note on MemPalace Cloud
+
+`cschnatz/mempalace-cloud-plugin` is a **third-party** plugin (not the MemPalace org) that adds
+OAuth, multi-device sync and a web UI. It is **not installed by default**, and for good reason:
+its hooks auto-save to `https://api.mempalace.cloud/mcp`, **not** your local palace. Running it
+alongside the local setup splits memory across two backends, and uploads session content —
+including anything work-related — to a third party. Opt in with `--with-cloud` only deliberately.
+
+The open-source core has no web UI. Inspect the palace locally instead:
+
+```bash
+mempalace status
+mempalace search "what you're looking for"
+sqlite3 ~/.mempalace/palace/chroma.sqlite3 \
+  "SELECT substr(string_value,1,300) FROM embedding_metadata WHERE key='chroma:document' LIMIT 20"
+```
