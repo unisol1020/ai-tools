@@ -20,15 +20,37 @@ for a in "$DIR"/agents/*.md; do
   link "$a" "$CLAUDE_DIR/agents/$(basename "$a")"
 done
 
+# The dispatch block in the user's global CLAUDE.md is what makes "test this" reach manual-qa
+# without naming it; agent descriptions alone are only a hint. Markers keep it replaceable.
+md="$CLAUDE_DIR/CLAUDE.md"; start='<!-- ai-tools:dispatch:start -->'; end='<!-- ai-tools:dispatch:end -->'
+if [ -f "$md" ] && grep -qF "$start" "$md"; then
+  cp -p "$md" "$md.bak-$(date +%Y%m%d-%H%M%S)"
+  awk -v s="$start" -v e="$end" -v f="$DIR/dispatch.md" '
+    index($0,s)==1 { while ((getline l < f) > 0) print l; skip=1; next }
+    index($0,e)==1 { skip=0; next }
+    !skip' "$md" > "$md.tmp" && mv "$md.tmp" "$md"
+  echo "  refreshed the agent-dispatch block in $md"
+else
+  if [ -s "$md" ]; then
+    [ -n "$(tail -c1 "$md")" ] && echo >> "$md"
+    echo >> "$md"
+  fi
+  cat "$DIR/dispatch.md" >> "$md"
+  echo "  appended the agent-dispatch block to $md"
+fi
+
 cat <<'DONE'
 
 Done. Next:
   1. Restart Claude Code once so the agents load.
-  2. Use them — Claude picks the right one automatically, or name one:
-       "plan this feature"                 → architect  (plans; never implements)
-       "add the endpoint / build the page" → backend-engineer / frontend-engineer
-       "write tests for this"              → automation-qa
-       reviews run after changes           → backend-reviewer / frontend-reviewer / security-reviewer
+  2. Just say what you need — the dispatch block now in ~/.claude/CLAUDE.md routes plain
+     requests to the right agent without naming it:
+       "plan this / how should we build it"     → architect  (plans; never implements)
+       "fix this in the api / add an endpoint"  → backend-engineer
+       "looks bad on the frontend / fix the form" → frontend-engineer
+       "write tests / cover this"               → automation-qa
+       "test this / check it works"             → qa-run skill → manual-qa (install qa/)
+       after code changes, before merge         → backend-reviewer / frontend-reviewer / security-reviewer
 
 Recommended for the architect's Phase 1 "grill" (interrogation) step — the **grill-me** skill
 by Matt Pocock. It's the best grill skill out there: a relentless, one-question-at-a-time

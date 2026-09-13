@@ -20,6 +20,21 @@ With [`memory/`](../memory/README.md) installed, every one of these agents has p
 
 The split is deliberate: engineers write code but not tests; the test-author writes tests but not code; reviewers only report. That separation is what lets the `architect` chain them safely.
 
+## Route on intent — you never have to name an agent
+
+Each agent's `description` leads with the plain phrases that should reach it ("test this", "plan this", "fix this in the api", "looks bad on the frontend"). Descriptions are only a hint to Claude, though, so `install.sh` also appends a short **dispatch block** to your global `~/.claude/CLAUDE.md` (the canonical copy is [`dispatch.md`](dispatch.md), kept between `<!-- ai-tools:dispatch -->` markers so a re-run refreshes it). With it in place:
+
+| You say | Claude dispatches |
+|---|---|
+| "test this", "check it works", "verify the flow", "does it look right" | the `qa-run` skill, which resolves URL + login and spawns `manual-qa` |
+| "plan this", "how should we build this", "add <feature>" (multi-file) | `architect` |
+| "fix this on the frontend", "looks bad on the client", "the form is broken" | `frontend-engineer` |
+| "fix this in the api", "add an endpoint", "write the migration" | `backend-engineer` |
+| "write tests", "cover this", and after any feature or fix lands | `automation-qa` |
+| after code changes, before merge | `backend-reviewer` / `frontend-reviewer`, plus `security-reviewer` when auth, input, data or secrets are touched |
+
+Don't want the block? Delete it from `~/.claude/CLAUDE.md`; the installer only re-adds it when the markers are absent.
+
 ## Install — just send this README to Claude Code
 
 You don't run anything. Paste this file (or its URL) into **Claude Code** and say *"install this"*.

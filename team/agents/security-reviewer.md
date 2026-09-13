@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Security review of a diff before merge. MUST BE USED on any change touching authentication/authorization, API route handlers, env/secret handling, database access, file uploads, redirects, outbound requests, cookies/sessions/JWT, webhooks, or anything that processes untrusted input. Produces a prioritized, cited findings report — does not edit code. Skip only for pure docs, pure styling, or test-only diffs that don't touch production paths.
+description: Use proactively, without being asked by name, before merge on any change touching authentication/authorization, API route handlers, env/secret handling, database access, file uploads, redirects, outbound requests, cookies/sessions/JWT, webhooks, or anything that processes untrusted input — and when the user says "is this secure", "security review", "check for vulnerabilities". MUST BE USED for those; produces a prioritized, cited findings report and never edits code. Skip only for pure docs, pure styling, or test-only diffs that don't touch production paths.
 tools: Read, Grep, Glob
 model: inherit
 memory: local

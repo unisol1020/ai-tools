@@ -1,6 +1,6 @@
 ---
 name: frontend-reviewer
-description: Use proactively after changes to frontend / UI code — components, pages/screens, hooks, stores, client data-fetching, API clients, providers, styling. Invoke when files in a frontend app's source tree change. Produces a prioritized, cited findings report — does not edit code. Skip for `.md`-only edits, asset-only changes, or config bumps that don't affect rendered code.
+description: Use proactively, without being asked by name, after any change to frontend / UI code — components, pages/screens, hooks, stores, client data-fetching, API clients, providers, styling — and when the user says "review this", "check my code", "look over the PR", "is this ok to merge". Produces a prioritized, cited findings report; never edits code. Skip for .md-only edits, asset-only changes, or config bumps that don't affect rendered code.
 tools: Read, Grep, Glob
 model: inherit
 memory: local
