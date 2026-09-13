@@ -16,6 +16,8 @@ The **crew of subagents** Claude Code delegates real work to — the ones that p
 | `frontend-reviewer` | Reviews frontend/UI changes — cited, prioritized findings. | report only |
 | `security-reviewer` | Security review of a diff before merge (authn/z, input, data, secrets, uploads, redirects, webhooks, …). | report only |
 
+With [`memory/`](../memory/README.md) installed, every one of these agents has persistent two-tier memory — what it learned about *this* repo (gitignored, shared across worktrees) plus best practices promoted to `~/.claude/agent-memory/` — and ends each report with a `memory:` stats line.
+
 The split is deliberate: engineers write code but not tests; the test-author writes tests but not code; reviewers only report. That separation is what lets the `architect` chain them safely.
 
 ## Install — just send this README to Claude Code

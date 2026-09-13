@@ -38,6 +38,12 @@ In task mode:
 
 The interactive steps below apply only to **human-initiated** runs (someone asks you to QA something directly).
 
+## Memory
+
+Before step 1 (in task mode, before the jump to step 8) run `"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/bin/agent-memory" context --skill qa-run` and follow what it prints — it carries this skill's memory protocol and the indexes to Read.
+Capture surprises to the inbox it names as you go, run its End step before the final report, and end the report with the `memory:` stats line.
+If the command is missing, skip this section.
+
 ## Steps
 
 1. **Resolve project + config.** `root = $(git rev-parse --show-toplevel 2>/dev/null || pwd)`. Config = `$root/.claude/qa.local.json` (`Read` if present).

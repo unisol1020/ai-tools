@@ -39,6 +39,12 @@ State lives in `<project-root>/.claude/tickets.local.json`. It holds **no secret
 
 Tracker tool names are **detected live each session** (MCP names change) — never store them. Missing config → run the detect + mapping gates once, then write it.
 
+## Memory
+
+Before step 1 run `"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/bin/agent-memory" context --skill ticket` and follow what it prints — it carries this skill's memory protocol and the indexes to Read.
+Capture surprises to the inbox it names as you go, run its End step before the final report, and end the report with the `memory:` stats line.
+If the command is missing, skip this section.
+
 ## Steps
 
 1. **Resolve project + check scope.** `root = $(git rev-parse --show-toplevel 2>/dev/null || pwd)`. **First apply the scope guard above** — if this repo ships its own ticket skill or matches the local defer list, stop here and defer. Otherwise read `$root/.claude/tickets.json` then `$root/.claude/tickets.local.json` (local wins).

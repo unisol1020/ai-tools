@@ -15,6 +15,12 @@ GitHub goes through the **`gh` CLI** (always works — `gh pr list/view/diff`, `
 ## Config
 This skill is mostly stateless. It reads the **tracker** mapping from `<root>/.claude/tickets.local.json` (the `ticket` skill's config) and an optional **post default** from `<root>/.claude/morning.local.json` (`review.postMode: "confirm" | "auto"`, default `confirm`). It writes nothing required.
 
+## Memory
+
+Before step 1 run `"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/bin/agent-memory" context --skill review-prs` and follow what it prints — it carries this skill's memory protocol and the indexes to Read.
+Capture surprises to the inbox it names as you go, run its End step before the final report, and end the report with the `memory:` stats line.
+If the command is missing, skip this section.
+
 ## Steps
 
 1. **Resolve the targets.** From the ask:

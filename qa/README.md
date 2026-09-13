@@ -2,6 +2,8 @@
 
 A QA agent for Claude Code that drives your running app — a **web app in a real browser** or a **native iOS app in the Simulator** — in any local project. You ask "does login work?", "does /pricing match this Figma?", or "test the native app in the simulator" in plain words; it opens the app, clicks through (or screenshots and compares), and reports PASS / FAIL with what it actually saw. It never writes tests and never edits your code.
 
+With [`memory/`](../memory/README.md) installed, `manual-qa` and the `qa-run` skill have persistent two-tier memory — the login dance, ports and flags of *this* repo (gitignored, shared across worktrees) plus best practices promoted to `~/.claude/agent-memory/` — so the second run in a project skips what the first one had to discover.
+
 One agent, **two modes × two platforms**, both picked from how you ask:
 
 - **Functional** — *"does it work?"* It plans like a senior QA — success path, error path, and the edge cases real users hit (double-submit, back mid-flow, expired session, empty/overflowing data, offline) — then drives the app to verify each.

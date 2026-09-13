@@ -28,6 +28,12 @@ Discover what's connected **this session** (`claude mcp list` + this session's d
 - **Tracker — Linear *or* Jira** — `list_issues`/`get_issue` (Linear) or the Jira equivalent; reuse the saved mapping.
 - **Slack** — `slack_search_public_and_private`, `slack_read_channel`, `slack_read_thread`, `slack_search_users`, `slack_read_user_profile`.
 
+## Memory
+
+Before step 1 run `"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/bin/agent-memory" context --skill morning` and follow what it prints — it carries this skill's memory protocol and the indexes to Read.
+Capture surprises to the inbox it names as you go, run its End step before the final report, and end the report with the `memory:` stats line.
+If the command is missing, skip this section.
+
 ## Steps
 
 1. **Resolve config + identity.** Read `~/.claude/morning.local.json`. Fill gaps once (AskUserQuestion): which **repos** to scan (offer the current repo + any you can infer), which **Slack channels** matter (or "just mentions + DMs"). Resolve "me": GitHub `gh api user --jq .login`; Linear current user (`get_user` "me"); Slack handle via `slack_search_users` on the user's name/email (`max.levchuk@fiveirongolf.com`) — cache the ids. Save.

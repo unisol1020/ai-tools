@@ -19,6 +19,12 @@ Run this to take a repo (and a fresh machine) from nothing to fully set up for t
 
 Only what's missing is installed; re-running is safe.
 
+## Memory
+
+Before step 1 run `"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/bin/agent-memory" context --skill bootstrap` and follow what it prints — it carries this skill's memory protocol and the indexes to Read.
+Capture surprises to the inbox it names as you go, run its End step before the final report, and end the report with the `memory:` stats line.
+If the command is missing, skip this section.
+
 ## Steps
 
 1. **Resolve repo + bootstrapped state.** `root = $(git rev-parse --show-toplevel 2>/dev/null || pwd)`. If `root` is already a line in `~/.claude/.bootstrapped-projects`, tell the user it's already bootstrapped and ask whether to re-run (refresh deps / re-index) or stop.
