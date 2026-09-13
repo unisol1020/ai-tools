@@ -33,6 +33,8 @@ Each agent's `description` leads with the plain phrases that should reach it ("t
 | "write tests", "cover this", and after any feature or fix lands | `automation-qa` |
 | after code changes, before merge | `backend-reviewer` / `frontend-reviewer`, plus `security-reviewer` when auth, input, data or secrets are touched |
 
+The block also says that a **ticket is intent**: work that arrives from a Linear/Jira issue, a PR, a Slack thread or an Orca workspace is classified by its symptom and the code it touches (visual → `frontend-engineer`, endpoint/data → `backend-engineer`, both or unclear → `architect` first, a repro-able bug with a running app → `qa-run` reproduces it first), and that Claude may spawn whichever agent it judges the task needs, in sequence or in parallel, without asking.
+
 Don't want the block? Delete it from `~/.claude/CLAUDE.md`; the installer only re-adds it when the markers are absent.
 
 ## Install — just send this README to Claude Code
