@@ -125,8 +125,24 @@ at user scope, and wires four capture hooks into `~/.claude/settings.json`:
 | `SessionEnd` | saves on close |
 | `PreCompact` | saves before context compaction |
 
-**The hooks are what make memory automatic.** The MCP on its own only exposes tools the model
-*may* call — without the hooks nothing is captured, which is not how claude-mem behaved.
+**Saving and recall are two separate mechanisms — you need both.**
+
+*Saving* is the `Stop` / `SessionEnd` / `PreCompact` hooks. Straightforward.
+
+*Recall* is the part that surprises people. MemPalace's own `session-start` hook injects
+**nothing** — read it, it only initialises tracking state and returns `{}`. MemPalace expects the
+model to pull memory on demand through MCP tools, whereas claude-mem pushed context in at session
+start. So two pieces restore that behaviour:
+
+1. `mempalace-session-start.sh` wraps MemPalace's real hook and appends `mempalace wake-up`
+   (~800 tokens of L0/L1 context) as `additionalContext`, so memory reaches every session
+   unprompted.
+2. `mempalace-rules.sh` writes a short block into `~/.claude/CLAUDE.md` telling the model to
+   search the palace before answering about past work, quote results verbatim, and say so when
+   the palace has nothing rather than guessing.
+
+Without (1) nothing is recalled automatically. Without (2) the model has the tools but no reason
+to reach for them. The MCP alone gives you neither.
 
 MemPalace stores verbatim text and embeds locally (`all-MiniLM-L6-v2`). No API key, no
 per-session model call, nothing to exhaust — which is why it replaced claude-mem here, whose

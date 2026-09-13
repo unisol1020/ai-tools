@@ -106,8 +106,14 @@ for event, name in (('SessionStart','session-start'), ('Stop','stop'),
     groups = hooks.setdefault(event, [])
     if any('mempalace' in str(h.get('command','')) for g in groups for h in g.get('hooks', [])):
         continue
-    cmd = ('[ -x "$HOME/.local/bin/mempalace" ] && "$HOME/.local/bin/mempalace" '
-           f'hook run --hook {name} --harness claude-code || printf \'{{}}\\n\'')
+    if event == 'SessionStart':
+        # MemPalace's own session-start hook injects NOTHING (it only tracks
+        # state). This wrapper runs it, then injects `mempalace wake-up` so
+        # memory actually reaches the session the way claude-mem did.
+        cmd = 'bash "$HOME/.claude/skills/bootstrap/mempalace-session-start.sh"'
+    else:
+        cmd = ('[ -x "$HOME/.local/bin/mempalace" ] && "$HOME/.local/bin/mempalace" '
+               f'hook run --hook {name} --harness claude-code || printf \'{{}}\\n\'')
     groups.append(collections.OrderedDict([("hooks", [
         collections.OrderedDict([("type", "command"), ("command", cmd)])])]))
     added.append(event)
@@ -115,6 +121,11 @@ json.dump(d, open(p, 'w'), indent=2)
 print("HOOKS:" + (",".join(added) if added else "already-present"))
 PYHOOK
   note "✓ mempalace capture hooks wired (SessionStart/Stop/SessionEnd/PreCompact)"
+fi
+
+# Recall rules: hooks make saving automatic, this makes the model actually look.
+if have mempalace && [ -f "$CLAUDE_DIR/skills/bootstrap/mempalace-rules.sh" ]; then
+  bash "$CLAUDE_DIR/skills/bootstrap/mempalace-rules.sh"
 fi
 
 echo "Done. Restart Claude Code once so the ponytail plugin + CodeGraph/MemPalace MCP load."

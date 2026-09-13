@@ -79,8 +79,11 @@ for event, name in (('SessionStart','session-start'),('Stop','stop'),
     groups = hooks.setdefault(event, [])
     if any('mempalace' in str(h.get('command','')) for g in groups for h in g.get('hooks',[])):
         continue
-    cmd = ('[ -x "$HOME/.local/bin/mempalace" ] && "$HOME/.local/bin/mempalace" '
-           f'hook run --hook {name} --harness claude-code || printf \'{{}}\\n\'')
+    if event == 'SessionStart':
+        cmd = 'bash "$HOME/.claude/skills/bootstrap/mempalace-session-start.sh"'
+    else:
+        cmd = ('[ -x "$HOME/.local/bin/mempalace" ] && "$HOME/.local/bin/mempalace" '
+               f'hook run --hook {name} --harness claude-code || printf \'{{}}\\n\'')
     groups.append(collections.OrderedDict([("hooks", [
         collections.OrderedDict([("type","command"),("command",cmd)])])]))
     added.append(event)
@@ -88,6 +91,8 @@ json.dump(d, open(p,'w'), indent=2)
 print("  ✓ capture hooks:", ", ".join(added) if added else "already present")
 PY
 fi
+
+[ -f "$SELF_DIR/mempalace-rules.sh" ] && bash "$SELF_DIR/mempalace-rules.sh"
 
 # 5. optional third-party cloud plugin ------------------------------------------
 if [ "$WITH_CLOUD" = 1 ] && have claude; then
