@@ -55,7 +55,7 @@ elif have graphify; then
     || note "… run 'graphify install' manually"
 fi
 
-# 4. plugins: ponytail + claude-mem (merge marketplace + enable into settings.json) -
+# 4. plugin: ponytail (merge marketplace + enable into settings.json) ----------
 if have jq; then
   mkdir -p "$CLAUDE_DIR"; sj="$CLAUDE_DIR/settings.json"; [ -f "$sj" ] || echo '{}' > "$sj"
   if jq -e '.enabledPlugins["ponytail@ponytail"] == true' "$sj" >/dev/null 2>&1; then
@@ -67,15 +67,26 @@ if have jq; then
         | .enabledPlugins["ponytail@ponytail"] = true' "$sj" > "$sj.tmp" && mv "$sj.tmp" "$sj" \
       && note "✓ ponytail marketplace + enable written to settings.json (fetched on next Claude Code start)"
   fi
-  if jq -e '.enabledPlugins["claude-mem@thedotmack"] == true' "$sj" >/dev/null 2>&1; then
-    note "✓ claude-mem plugin already enabled"
-  else
-    cp -p "$sj" "$sj.bak-$(ts)"
-    jq '.extraKnownMarketplaces.thedotmack.source = {source:"github", repo:"thedotmack/claude-mem"}
-        | .enabledPlugins = (.enabledPlugins // {})
-        | .enabledPlugins["claude-mem@thedotmack"] = true' "$sj" > "$sj.tmp" && mv "$sj.tmp" "$sj" \
-      && note "✓ claude-mem marketplace + enable written to settings.json (fetched on next Claude Code start)"
-  fi
-else note "✗ jq needed to enable the ponytail + claude-mem plugins — brew install jq"; fi
+else note "✗ jq needed to enable the ponytail plugin — brew install jq"; fi
 
-echo "Done. Restart Claude Code once so the ponytail + claude-mem plugins + CodeGraph MCP load."
+# 5. MemPalace: cross-session memory — local embeddings, no API key ------------
+if have mempalace; then note "✓ mempalace already installed"
+else
+  if have uv; then uv tool install mempalace >/dev/null 2>&1
+  elif have pipx; then pipx install mempalace >/dev/null 2>&1
+  elif have brew; then brew install uv >/dev/null 2>&1 && uv tool install mempalace >/dev/null 2>&1
+  else note "✗ mempalace needs uv or pipx (Python 3.10+) — 'brew install uv', then re-run"; fi
+  have mempalace && note "✓ mempalace installed" \
+    || note "… mempalace not on PATH — add ~/.local/bin (try 'uv tool update-shell'), reopen shell, re-run"
+fi
+if have mempalace && have claude; then
+  if claude mcp list 2>/dev/null | grep -q '^mempalace'; then
+    note "✓ mempalace MCP already registered"
+  else
+    claude mcp add mempalace -- mempalace-mcp >/dev/null 2>&1 \
+      && note "✓ mempalace MCP registered (available after restart)" \
+      || note "… run 'claude mcp add mempalace -- mempalace-mcp' manually"
+  fi
+fi
+
+echo "Done. Restart Claude Code once so the ponytail plugin + CodeGraph/MemPalace MCP load."

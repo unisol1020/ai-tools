@@ -13,7 +13,7 @@ Run this to take a repo (and a fresh machine) from nothing to fully set up for t
 - **CodeGraph** — the `@colbymchenry/codegraph` CLI + its MCP server in Claude Code, then a built index of this repo.
 - **graphify** — the `graphifyy` PyPI package (provides the `graphify` CLI; Python 3.10+, installed via uv/pipx) + the `/graphify` skill, plus an optional **per-commit auto-sync** that keeps the graph fresh with zero tokens.
 - **ponytail** — the ponytail Claude Code plugin (lazy-senior-dev mode: YAGNI, stdlib-first, fewest lines).
-- **claude-mem** — the [claude-mem](https://github.com/thedotmack/claude-mem) Claude Code plugin (persistent cross-session memory; ships the `/learn-codebase` priming skill).
+- **MemPalace** — the [MemPalace](https://github.com/MemPalace/mempalace) memory engine (`mempalace` PyPI package, installed via uv/pipx) + its MCP server. Persistent cross-session memory that stores verbatim text with **local embeddings — no API key, no per-session LLM call, no quota to exhaust**.
 - **Standard code-comment policy** — writes the required `## Code Comments` rules (no comments by default; one-line `why` only) into the repo's `CLAUDE.md` and any existing `AGENTS.md` / `AGENT.md`, so every project enforces the same standard.
 
 Only what's missing is installed; re-running is safe.
@@ -26,7 +26,7 @@ Only what's missing is installed; re-running is safe.
    ```bash
    bash ~/.claude/skills/bootstrap/setup-env.sh
    ```
-   Relay what it installed vs what was already there. It handles ripgrep, the CodeGraph CLI + MCP, graphify + its skill, and writes the ponytail + claude-mem plugins into `~/.claude/settings.json`. The plugins + CodeGraph MCP only surface after a **Claude Code restart** — note that for the end.
+   Relay what it installed vs what was already there. It handles ripgrep, the CodeGraph CLI + MCP, graphify + its skill, MemPalace + its MCP, and writes the ponytail plugin into `~/.claude/settings.json`. The plugin + the CodeGraph/MemPalace MCPs only surface after a **Claude Code restart** — note that for the end.
 
 3. **Build the CodeGraph index.** If `$root/.codegraph/` doesn't exist:
    - **Large repo** (lots of files / a big monorepo)? **Ask first** — indexing can take a while and spins up workers. On confirm (or for a normal-size repo): `codegraph init "$root"`.
@@ -40,7 +40,12 @@ Only what's missing is installed; re-running is safe.
    ```
    Idempotent — re-running won't duplicate the hook. The hook only takes effect after a **Claude Code restart** (note it for the end). Tell the user: code changes stay fresh automatically and free; **doc/README/spec changes still need a manual `/graphify --update`** (those are the only token-costing files). If the installer warns that `.claude/` isn't gitignored, relay it.
 
-6. **Prime claude-mem's memory (optional, heavy).** Offer to run `/learn-codebase` — claude-mem's priming skill reads every source file in full to front-load a cross-session memory cache. It costs tokens (proportional to repo size). **Ask before running**; run on confirm, skip otherwise. Needs a **Claude Code restart** first so the plugin's skill is loaded — if you bootstrapped in the same session, tell the user to restart then run `/learn-codebase` themselves.
+6. **Prime MemPalace's memory (optional, heavy — but free).** Offer to file the repo into the palace:
+   ```bash
+   mempalace init "$root" --yes --no-llm
+   mempalace mine "$root"
+   ```
+   This is **zero-token** — embeddings run locally, the model is never called. It is still CPU/RAM heavy and can take a while on a big repo, so **ask before running**; run on confirm, skip otherwise. Check the dry run first (`mempalace mine "$root" --dry-run`) and relay the drawer count — if it reports *files skipped (chunk cap)*, say so rather than letting oversized files drop silently.
 
 7. **Augment CLAUDE.md + enforce the comment policy.** Two parts, both non-destructive (back up each file before editing):
    - **a. Stack note.** Create or update `$root/CLAUDE.md` with a short note that CodeGraph is indexed and should be reached for before grep/find on code questions (mirror the user's global convention), plus the detected stack. Don't duplicate a note that's already there.
@@ -48,11 +53,11 @@ Only what's missing is installed; re-running is safe.
 
 8. **Record completion.** Append `root` as a new line to `~/.claude/.bootstrapped-projects` (create the file if missing; no duplicates). This stops the session-start nudge for this repo.
 
-9. **Report.** What was installed, whether the index built, whether graphify ran, whether the per-commit auto-sync was enabled, whether claude-mem was primed, which files got the Code Comments policy (created vs updated), and: **restart Claude Code once** so the ponytail + claude-mem plugins + CodeGraph MCP load.
+9. **Report.** What was installed, whether the index built, whether graphify ran, whether the per-commit auto-sync was enabled, whether MemPalace was primed (and any files it skipped at the chunk cap), which files got the Code Comments policy (created vs updated), and: **restart Claude Code once** so the ponytail plugin + CodeGraph/MemPalace MCPs load.
 
 ## Rules
 
 - **Idempotent + non-destructive.** Install only the gaps; back up `settings.json` / `CLAUDE.md` before editing; don't re-index a fresh index without a reason.
-- **Ask before the heavy/slow steps** — indexing a large repo, running `/graphify`, and priming with `/learn-codebase`. Don't start them silently.
+- **Ask before the heavy/slow steps** — indexing a large repo, running `/graphify`, and priming with `mempalace mine`. Don't start them silently.
 - **Keep private data local.** `~/.claude/.bootstrapped-projects` lists real repo paths; it lives under `~/.claude` and is never committed to any repo.
 - **No secrets, no prod actions.** This only installs dev tooling and indexes locally.

@@ -10,7 +10,7 @@ One command that takes a repo — and a teammate's fresh machine — from nothin
 flowchart TD
   A[Run /bootstrap in a repo] --> B{Already in<br>.bootstrapped-projects?}
   B -- yes --> C[Ask: re-run or stop]
-  B -- no --> D[setup-env.sh:<br>install/verify ripgrep, CodeGraph + MCP,<br>graphify + skill, ponytail, claude-mem]
+  B -- no --> D[setup-env.sh:<br>install/verify ripgrep, CodeGraph + MCP,<br>graphify + skill, ponytail, MemPalace + MCP]
   C --> D
   D --> E{.codegraph/ exists?}
   E -- no --> F[codegraph init<br>ask first if repo is large]
@@ -19,13 +19,13 @@ flowchart TD
   G --> H
   H --> I{graph built?}
   I -- yes --> J[Offer per-commit auto-sync hook]
-  I -- no --> K[Offer /learn-codebase<br>claude-mem priming, ask first]
+  I -- no --> K[Offer mempalace mine<br>MemPalace priming, ask first]
   J --> K
   K --> L[Augment CLAUDE.md<br>+ write Code Comments policy]
   L --> M[Append repo to .bootstrapped-projects<br>nudge stops]
 ```
 
-Walkthrough: `setup-env.sh` checks each tool with `command -v` and installs the gaps — `brew install ripgrep`, `codegraph` via volta/npm then `codegraph install -y` to wire its MCP, `graphifyy` via uv/pipx then `graphify install` for the skill, and the ponytail + claude-mem plugins written into `~/.claude/settings.json`. Then `/bootstrap` builds the CodeGraph index (asking first on a large repo), optionally builds the graphify graph, and — only if a graph got built — offers a per-commit hook that refreshes it on every `git commit`. It augments the repo's `CLAUDE.md` and, by default, writes the standard `## Code Comments` policy (no comments by default; one-line `why` only) verbatim into `CLAUDE.md` plus any existing `AGENTS.md` / `AGENT.md` (root and nested), then appends the repo path to `~/.claude/.bootstrapped-projects` so the session-start nudge stops firing for it.
+Walkthrough: `setup-env.sh` checks each tool with `command -v` and installs the gaps — `brew install ripgrep`, `codegraph` via volta/npm then `codegraph install -y` to wire its MCP, `graphifyy` via uv/pipx then `graphify install` for the skill, the ponytail plugin written into `~/.claude/settings.json`, and `mempalace` via uv/pipx with its MCP registered. Then `/bootstrap` builds the CodeGraph index (asking first on a large repo), optionally builds the graphify graph, and — only if a graph got built — offers a per-commit hook that refreshes it on every `git commit`. It augments the repo's `CLAUDE.md` and, by default, writes the standard `## Code Comments` policy (no comments by default; one-line `why` only) verbatim into `CLAUDE.md` plus any existing `AGENTS.md` / `AGENT.md` (root and nested), then appends the repo path to `~/.claude/.bootstrapped-projects` so the session-start nudge stops firing for it.
 
 Plugins and the CodeGraph MCP only surface after a Claude Code restart — `/bootstrap` says so at the end.
 
@@ -49,7 +49,7 @@ The toolchain it installs:
 | **CodeGraph** | `@colbymchenry/codegraph` CLI + its MCP server, then a built index of the repo | volta/npm install → `codegraph install -y` → `codegraph init` |
 | **graphify** | the `graphifyy` PyPI package (provides the `graphify` CLI, Python 3.10+) + the `/graphify` skill | `uv tool install graphifyy` (or pipx) → `graphify install` |
 | **ponytail** | the [ponytail](https://github.com/DietrichGebert/ponytail) plugin — lazy-senior-dev mode (YAGNI, stdlib-first, fewest lines) | marketplace + enable written to `~/.claude/settings.json` |
-| **claude-mem** | the [claude-mem](https://github.com/thedotmack/claude-mem) plugin — cross-session memory + the `/learn-codebase` priming skill | marketplace + enable written to `~/.claude/settings.json` |
+| **MemPalace** | the [MemPalace](https://github.com/MemPalace/mempalace) memory engine — cross-session memory, verbatim storage, **local embeddings (no API key, no LLM call, no quota)** | `uv tool install mempalace` + `claude mcp add mempalace -- mempalace-mcp` |
 
 ## Install — send this README to Claude Code
 
@@ -65,9 +65,9 @@ The toolchain it installs:
 >    ```bash
 >    bash ~/.ai-tools/bootstrap/install.sh
 >    ```
->    Add `--with-deps` to also install the toolchain (ripgrep / CodeGraph / graphify / ponytail / claude-mem) right now. **Ask the user first** — it runs brew / npm / uv.
+>    Add `--with-deps` to also install the toolchain (ripgrep / CodeGraph / graphify / ponytail / MemPalace) right now. **Ask the user first** — it runs brew / npm / uv.
 > 4. **Verify:** `ls -la ~/.claude/skills/bootstrap` is a symlink into `~/.ai-tools/bootstrap`.
-> 5. **Report back:** tell the user to **restart Claude Code once**, then open any repo and run **`/bootstrap`** — it installs the required extensions if missing, builds the CodeGraph index, offers `/graphify`, and records the repo. The ponytail + claude-mem plugins and the CodeGraph MCP surface after the restart.
+> 5. **Report back:** tell the user to **restart Claude Code once**, then open any repo and run **`/bootstrap`** — it installs the required extensions if missing, builds the CodeGraph index, offers `/graphify`, and records the repo. The ponytail plugin and the CodeGraph + MemPalace MCPs surface after the restart.
 >
 > Update later with `git -C ~/.ai-tools pull` — the symlink picks it up.
 
@@ -90,7 +90,7 @@ The teammate path, start to finish:
 
 1. Install this once (above), restart Claude Code.
 2. Open any repo. Claude nudges you that it isn't bootstrapped.
-3. Run **`/bootstrap`**. It installs what's missing, indexes the repo, asks before the slow steps (large-repo indexing, `/graphify`, `/learn-codebase`), and records the repo as done.
+3. Run **`/bootstrap`**. It installs what's missing, indexes the repo, asks before the slow steps (large-repo indexing, `/graphify`, `mempalace mine`), and records the repo as done.
 
 Want to set the toolchain up from a terminal without opening a repo? Run the bundled script directly — it installs only what's missing:
 
