@@ -136,7 +136,12 @@ start. So two pieces restore that behaviour:
 
 1. `mempalace-session-start.sh` wraps MemPalace's real hook and appends `mempalace wake-up`
    (~800 tokens of L0/L1 context) as `additionalContext`, so memory reaches every session
-   unprompted.
+   unprompted. It resolves the wing from your git root, so you get *this* repo's memory.
+
+   This only works because the migration mines **one wing per root project**. Mined flat into a
+   single wing, `wake-up` ignores your cwd and returns whichever project it feels like — you sit
+   in one repo and get another repo's July notes. claude-mem's project scoping was implicit;
+   here it has to be built.
 2. `mempalace-rules.sh` writes a short block into `~/.claude/CLAUDE.md` telling the model to
    search the palace before answering about past work, quote results verbatim, and say so when
    the palace has nothing rather than guessing.

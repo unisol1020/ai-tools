@@ -42,20 +42,30 @@ if [ -f "$HOME/.claude-mem/claude-mem.db" ]; then
   else note "✗ need node + sqlite3 to export claude-mem — skipping export"; fi
 else note "· no claude-mem database found — nothing to export"; fi
 
-# 3. ingest ---------------------------------------------------------------------
-if [ "$SKIP_MINE" = 0 ] && [ -d "$EXPORT_DIR" ]; then
-  mempalace init "$EXPORT_DIR" --yes --no-llm >/dev/null 2>&1
+# 3. ingest — one wing per root project -----------------------------------------
+# Mining everything into a single wing makes `mempalace wake-up` return whichever
+# project it likes regardless of your cwd, so session-start injects the wrong
+# repo's memory. One wing per root project keeps recall scoped.
+if [ "$SKIP_MINE" = 0 ] && [ -d "$EXPORT_DIR/projects" ]; then
   note "→ dry run…"
-  DRY="$(mempalace mine "$EXPORT_DIR" --dry-run 2>&1)"
-  echo "$DRY" | grep -E "Files processed|Files skipped|Drawers filed" | sed 's/^/    /'
-  # A file over the chunk cap is skipped SILENTLY by mempalace — surface it loudly.
-  if echo "$DRY" | grep -q "chunk cap"; then
-    SKIPPED="$(echo "$DRY" | grep "chunk cap" | tr -d '\n')"
-    note "⚠ SOME FILES WERE SKIPPED AT THE CHUNK CAP: $SKIPPED"
-    note "⚠ those memories will NOT be imported — raise MEMPALACE_MAX_CHUNKS_PER_FILE or split them"
-  fi
-  note "→ mining (local embeddings, no API key; this is CPU-heavy and can take a while)…"
-  mempalace mine "$EXPORT_DIR" 2>&1 | tail -8 | sed 's/^/    /'
+  TOTAL_SKIP=0
+  for d in "$EXPORT_DIR"/projects/*/; do
+    [ -d "$d" ] || continue
+    DRY="$(mempalace mine "$d" --wing "$(basename "$d")" --dry-run 2>&1)"
+    if echo "$DRY" | grep -q "chunk cap"; then
+      TOTAL_SKIP=1
+      note "⚠ $(basename "$d"): $(echo "$DRY" | grep 'chunk cap' | tr -d '\n')"
+    fi
+  done
+  [ "$TOTAL_SKIP" = 1 ] && note "⚠ files above were SKIPPED SILENTLY — those memories will NOT import"
+
+  note "→ mining (local embeddings, no API key; CPU-heavy, can take a while)…"
+  for d in "$EXPORT_DIR"/projects/*/; do
+    [ -d "$d" ] || continue
+    W="$(basename "$d")"
+    printf '    %-40s' "$W"
+    mempalace mine "$d" --wing "$W" 2>&1 | grep -oE "Drawers filed: [0-9]+" | tail -1
+  done
   mempalace status 2>&1 | grep -i drawers | sed 's/^/    /'
 fi
 

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# SessionStart hook: inject MemPalace wake-up context into the session.
+# SessionStart hook: inject MemPalace wake-up context for the CURRENT project.
 #
-# MemPalace's own session-start hook only initialises tracking state and always
-# returns {} — it injects nothing, because MemPalace expects the model to pull
-# memory on demand through MCP tools. claude-mem instead pushed context in at
-# session start. This wrapper restores that behaviour: it still runs MemPalace's
-# real hook (so session state is tracked), then appends `mempalace wake-up`
-# (~800 tokens of L0/L1 context) as additionalContext.
+# Two things MemPalace does not do on its own:
+#   1. Its session-start hook injects nothing — it only initialises tracking
+#      state and returns {}. Memory is expected to be pulled via MCP tools,
+#      whereas claude-mem pushed it in at session start.
+#   2. `wake-up` with no --wing returns whatever wing it likes, ignoring cwd.
+# This wrapper runs the real hook, resolves the wing from the repo you are in,
+# and injects that project's wake-up text.
 set -uo pipefail
 
 MP="$HOME/.local/bin/mempalace"
@@ -16,18 +17,29 @@ command -v mempalace >/dev/null 2>&1 && MP="$(command -v mempalace)"
 INPUT="$(cat 2>/dev/null || true)"
 printf '%s' "$INPUT" | "$MP" hook run --hook session-start --harness claude-code >/dev/null 2>&1 || true
 
-CTX="$("$MP" wake-up 2>/dev/null || true)"
+CWD="$(printf '%s' "$INPUT" | python3 -c 'import json,sys
+try: print(json.load(sys.stdin).get("cwd","") or "")
+except Exception: print("")' 2>/dev/null || true)"
+[ -z "$CWD" ] && CWD="$PWD"
+WING="$(cd "$CWD" 2>/dev/null && basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" 2>/dev/null || true)"
+
+CTX=""
+[ -n "$WING" ] && CTX="$("$MP" wake-up --wing "$WING" 2>/dev/null || true)"
+# An unknown wing yields an empty/identity-only body; fall back to unscoped.
+case "$CTX" in *"ESSENTIAL STORY"*) ;; *) CTX="$("$MP" wake-up 2>/dev/null || true)" ;; esac
 [ -z "${CTX// }" ] && { printf '{}\n'; exit 0; }
 
-MEMPALACE_CTX="$CTX" python3 -c '
+MEMPALACE_CTX="$CTX" MEMPALACE_WING="${WING:-all}" python3 -c '
 import json, os
 ctx = os.environ.get("MEMPALACE_CTX", "").strip()
 if not ctx:
     print("{}"); raise SystemExit
+wing = os.environ.get("MEMPALACE_WING", "all")
 print(json.dumps({"hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "# MemPalace memory (recalled automatically)\n\n"
+    "additionalContext": f"# MemPalace memory — project: {wing}\n\n"
                          + ctx
-                         + "\n\nSearch deeper with the mempalace_search MCP tool when this is not enough.",
+                         + "\n\nThis is a summary. Search the full palace with the "
+                           "mempalace_search MCP tool before answering about past work.",
 }}))
 ' 2>/dev/null || printf '{}\n'

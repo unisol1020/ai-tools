@@ -49,7 +49,12 @@ for (const project of projects) {
      FROM session_summaries WHERE project='${esc}' ORDER BY created_at_epoch ASC`
   );
 
-  const dir = join(OUT, 'projects', slug(project));
+  // One directory per ROOT project (the segment before the first '/'), so each
+  // root can be mined as its own MemPalace wing. A single flat wing makes
+  // `mempalace wake-up` return whichever project it likes, ignoring your cwd.
+  const root = project.includes('/') ? project.slice(0, project.indexOf('/')) : project;
+  const sub = project.includes('/') ? project.slice(project.indexOf('/') + 1) : '';
+  const dir = sub ? join(OUT, 'projects', slug(root), slug(sub)) : join(OUT, 'projects', slug(root));
   mkdirSync(dir, { recursive: true });
   const months = new Map();
   const bucket = (m) => {
@@ -110,5 +115,5 @@ No LLM calls were used. This is a pure transform of local SQLite text.
 `);
 
 console.log(`${total} observations · ${projects.length} projects · ${prompts.length} prompts`);
-console.log(`  mine-ready : ${OUT}`);
+console.log(`  mine-ready : ${OUT}/projects/<root>  (mine each root as its own wing)`);
 console.log(`  archive    : ${ARCHIVE}`);
