@@ -56,7 +56,7 @@ if ASCII:
 else:
     G = dict(brand="󰙴  " if NERD else "✦ ", effort="󰧑  " if NERD else "",
              dir="  " if NERD else "", branch="  " if NERD else "⎇ ",
-             pr="  " if NERD else "PR ", fork="  " if NERD else "⚇ ",
+             pr="  " if NERD else "PR ", fork="  " if NERD else "⚇ ",
              up="↑", down="↓", delta="±", dot="●",
              fill="━", rest="─", gap="   ")
 
