@@ -1,22 +1,24 @@
 # statusline
 
-A Claude Code status line built as **instrumentation for the current session** — two lines, one meter, no noise.
+A quiet, two-line Claude Code status line scoped to **the current session**.
 
 ```
-◆ Opus 5 1M · ▇ xhigh ·  claude-tools · ⎇ main ⇡2 ⇣ · ±7 · +312 -87 · ⬡ ok · PR#42 ● · 30m · PONYTAIL
+ claude-tools    statusline-and-config ±28 ↑2   +2822 −62    #42 ●
 
-████████████▋░░░░░░░  63% 167k/1M
+◆ Fable 5.1 1M   xhigh   43m   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 29%  294k   ponytail
 ```
 
-**Line 1 — where you are.** Model, context window size, reasoning effort, thinking/fast mode, subagent or worktree, directory, branch with ahead/behind, changed-file count, lines added/removed, codegraph index state, open PR with review state, elapsed time.
+**Line 1 — where you are.** Directory, branch (with changed-file count and ahead/behind when non-zero), lines added and removed this session, the open PR and its review state. A worktree or subagent name appears here when you're in one; a stale codegraph index shows as `graph ~12`.
 
-**Line 2 — how full the context window is,** and nothing else: the meter, the percentage, and tokens used against the window size. A blank row separates it from the dense line above.
+**Line 2 — the session.** Model, context window size, reasoning effort, elapsed time, and the context meter with tokens used.
 
-The meter fills in **eighth-blocks**, so it carries eight times the resolution of its twenty characters, on a green→yellow→red gradient. It stays small on purpose — it sits under a busy line, and a full-width bar swamps it. There is no label, because a bar that colour, in that place, needs no caption.
+## Design
 
-## Scope: this session only
+Two greys and one accent. Text and branch in white, everything secondary in grey, and colour only where it carries meaning: peach for a dirty tree, green and red for lines, and the meter itself — lavender until 70 %, peach to 90 %, red past that.
 
-No spend, no 5-hour window, no 7-day window — those are account-level and Orca already shows them. No prompt-cache or API-wait gauges either: if a number needs a caption to be understood, it isn't glanceable. Everything on both lines describes the session in front of you.
+Groups are separated by whitespace, not dots. Nothing is shown for "nothing": no `⬡ none`, no empty `↑↓`, no `$0.00`. The meter is a thin rule, the way pnpm draws progress, because a heavy block bar under a line of text swamps it.
+
+Nothing account-level — no spend, no 5-hour or 7-day windows. Orca shows those.
 
 ## Install
 
@@ -25,31 +27,27 @@ No spend, no 5-hour window, no 7-day window — those are account-level and Orca
 ./demo.sh             # preview every state without restarting Claude Code
 ```
 
-Needs Python 3 (stdlib only — no `jq`, no dependencies). Restart Claude Code after installing.
+Python 3, stdlib only. Restart Claude Code after installing.
 
 ## Configuration
 
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `SL_WIDTH` | detected, else `110` | Column budget. Claude Code runs the script without a tty, so set this if your terminal is much wider or narrower. |
-| `SL_ASCII` | `0` | Pure ASCII — no block glyphs, no icons. Also turns on automatically when the locale isn't UTF-8. |
-| `SL_NO_NERD` | `0` | Keep Unicode but drop Nerd Font icons. |
+| `SL_GAP` | `1` | A spacer row between the two lines (a zero-width space, since Claude Code drops empty rows). `0` reclaims the row. |
+| `SL_ASCII` | `0` | Pure ASCII. Also on automatically when the locale isn't UTF-8. |
+| `SL_NO_NERD` | `0` | Keep Unicode but drop the Nerd Font icons. |
 | `NO_COLOR` | unset | Monochrome. |
-| `SL_GAP` | `1` | Blank row between the two lines. Set `0` to reclaim the terminal row. |
 
-The layout is responsive: the meter shrinks to fit the width, and line 1 sheds segments by priority — the model, directory and PONYTAIL badge are the last to go.
-
-### Animation (off by default)
-
-The script can shimmer the meters and pulse the brand mark, but that needs `"refreshInterval": 1` in the `statusLine` block, which re-runs it **every second** (~40 ms of CPU per second). It's off because the cost outweighs it. To try it, add `"refreshInterval": 1` to `statusLine` in `~/.claude/settings.json`.
+Narrow terminals shed segments by priority; the directory, branch, model and meter are the last to go.
 
 ## Performance
 
-Git state is cached 5 s and the codegraph probe 30 s, both keyed per directory, so switching repos never shows another repo's branch. Every subprocess has a timeout. Typical run is well under 50 ms.
+Git state is cached 5 s and the codegraph probe 30 s, keyed per directory so switching repos never shows another repo's branch. Every subprocess has a timeout. Survives empty, malformed and non-UTF-8 input without a traceback and always exits 0 — `demo.sh` asserts it.
 
 ## Credits
 
-- Style and several ideas — the brand diamond, the gradient bar, hiding zero-valued segments — come from [kcchien/claude-code-statusline](https://github.com/kcchien/claude-code-statusline) (MIT).
+- Started from [kcchien/claude-code-statusline](https://github.com/kcchien/claude-code-statusline) (MIT) — the brand diamond and the habit of hiding zero-valued segments survive from there.
 - Palette is [Catppuccin Mocha](https://github.com/catppuccin/catppuccin).
-- Icons need a [Nerd Font](https://www.nerdfonts.com/) (JetBrains Mono Nerd Font here); without one, set `SL_NO_NERD=1`.
+- Icons need a [Nerd Font](https://www.nerdfonts.com/); without one, set `SL_NO_NERD=1`.
 - Payload reference: [Claude Code status line docs](https://code.claude.com/docs/en/statusline).
