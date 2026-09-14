@@ -2,11 +2,10 @@
 """Claude Code status line — at-a-glance instrumentation, current session only.
 
 Line 1  identity / place / repo state
-Line 2  three matched high-resolution meters (eighth-block sub-cell fill)
+Line 2  one wide context meter (eighth-block sub-cell fill), its trend, and tokens
 
 Scope is deliberately this session: no spend, no 5h/7d rate-limit windows —
-Orca already surfaces those. The meters are CTX (context window), CCH (prompt
-cache) and API (share of session wall time spent waiting on the API).
+Orca already surfaces those.
 
 Env overrides: SL_WIDTH, SL_ASCII, SL_NO_NERD, NO_COLOR
 """
@@ -448,87 +447,11 @@ def gauge(label, frac, pct_txt, ramp, extra, cells, hot, lab_tone=None):
             else:
                 lab_tone = PAL["sub"]
     tip = ramp_at(ramp, frac) if frac is not None else PAL["dim"]
-    s = paint(lab_tone, "%7s" % label[:7], boldlab) + " " + meter(frac, cells, ramp) \
-        + " " + paint(tip, "%4s" % pct_txt)
+    s = (paint(lab_tone, "%7s" % label[:7], boldlab) + " ") if label else ""
+    s += meter(frac, cells, ramp) + " " + paint(tip, "%4s" % pct_txt)
     if extra is not None:
         s += " " + extra
     return s
-
-
-def fit_cells(budget, n_gauges, n_extras):
-    """Widest meter that fits: label(7)+sp+cells+sp+pct(4), +sp+extra(4), sep 3."""
-    for cells in range(12, 3, -1):
-        for extras in (n_extras, 0):
-            w = n_gauges * (cells + 13) + extras * 5 + 3 * (n_gauges - 1)
-            if w <= budget:
-                return cells, extras > 0
-    return 0, False
-
-
-def build_gauges(d, W, trend):
-    cw = d.get("context_window") or {}
-    pct = fnum(cw.get("used_percentage"))
-    size = fnum(cw.get("context_window_size")) or 0
-    if pct is None:
-        cu = cw.get("current_usage") or {}
-        tot = sum(fnum(cu.get(k), 0) or 0 for k in
-                  ("input_tokens", "output_tokens", "cache_creation_input_tokens",
-                   "cache_read_input_tokens"))
-        if size > 0 and tot > 0:
-            pct = tot * 100.0 / size
-
-    pc = d.get("prompt_cache") or {}
-    hr = fnum(pc.get("hit_ratio"))
-    if hr is not None and hr > 1:
-        hr = hr / 100.0
-    warm = bool(pc.get("warm"))
-    if pc and hr is None and pc.get("requests"):
-        req = fnum(pc.get("requests"), 0) or 0
-        mis = fnum(pc.get("misses"), 0) or 0
-        hr = (req - mis) / req if req > 0 else None
-    if not pc:
-        cstat, ctone = "", PAL["dim"]
-    elif not warm:
-        cstat, ctone = "cold", PAL["blue"]
-    else:
-        cstat = countdown(fnum(pc.get("expires_at"))) or str(pc.get("ttl") or "")
-        ctone = PAL["dim"]
-    cstat = (cstat or "")[:4]
-
-    wall = (fnum(dig(d, "cost.total_duration_ms"), 0) or 0) / 1000.0
-    api = (fnum(dig(d, "cost.total_api_duration_ms"), 0) or 0) / 1000.0
-    share = (api / wall) if wall > 0 and api > 0 else None
-
-    def ptxt(v):
-        return GL["none"] if v is None else "%d%%" % int(round(v))
-
-    cells, extras = fit_cells(W - 3, 3, 3)
-    if not cells:
-        parts = [paint(PAL["sub"], "CONTEXT ") + paint(ramp_at(LOAD_RAMP, (pct or 0) / 100.0), ptxt(pct)),
-                 paint(PAL["sub"], "CACHE ") + paint(ramp_at(WARM_RAMP, hr or 0),
-                                                   ptxt(None if hr is None else hr * 100)),
-                 paint(PAL["sub"], "WAIT ") + paint(ramp_at(WARM_RAMP, share or 0),
-                                                   ptxt(None if share is None else share * 100))]
-        return paint(PAL["faint"], GL["bay"]).join(parts)
-
-    g = []
-    g.append(gauge("CONTEXT", None if pct is None else clamp01(pct / 100.0), ptxt(pct),
-                   LOAD_RAMP,
-                   paint(ramp_at(LOAD_RAMP, (pct or 0) / 100.0), spark(trend, 4))
-                   if extras else None, cells, pct))
-
-    clab = PAL["blue"] if (pc and not warm) else (
-        PAL["dim"] if hr is None else (PAL["sub"] if hr >= 0.6 else PAL["peach"]))
-    g.append(gauge("CACHE", None if hr is None else clamp01(hr),
-                   ptxt(None if hr is None else hr * 100), WARM_RAMP,
-                   paint(ctone, "%4s" % (cstat or GL["none"])) if extras else None,
-                   cells, None, lab_tone=clab))
-
-    g.append(gauge("WAIT", None if share is None else clamp01(share),
-                   ptxt(None if share is None else share * 100), WARM_RAMP,
-                   paint(PAL["dim"], "%4s" % (elapsed(wall) if wall >= 1 else GL["none"]))
-                   if extras else None, cells, None, lab_tone=PAL["dim"]))
-    return paint(PAL["faint"], GL["bay"]).join(g)
 
 
 def elapsed(seconds):
@@ -539,6 +462,40 @@ def elapsed(seconds):
     if h:
         return "%dh%02d" % (h, m)
     return "%dm" % m if m else "%ds" % seconds
+
+
+def build_gauges(d, W, trend):
+    """One full-width context meter — the only number worth a gauge of its own."""
+    cw = d.get("context_window") or {}
+    pct = fnum(cw.get("used_percentage"))
+    size = fnum(cw.get("context_window_size")) or 0
+    tok = (fnum(cw.get("total_input_tokens"), 0) or 0) \
+        + (fnum(cw.get("total_output_tokens"), 0) or 0)
+    if pct is None:
+        cu = cw.get("current_usage") or {}
+        tot = sum(fnum(cu.get(k), 0) or 0 for k in
+                  ("input_tokens", "output_tokens", "cache_creation_input_tokens",
+                   "cache_read_input_tokens"))
+        if size > 0 and tot > 0:
+            pct = tot * 100.0 / size
+
+    trail = ""
+    if tok > 0 and size > 0:
+        trail = "%s/%s" % (compact_tokens(tok), compact_tokens(size))
+    elif tok > 0:
+        trail = compact_tokens(tok)
+
+    fixed = 1 + 4  # gap, "100%"
+    extra = (1 + 4) if trend else 0                 # braille trend
+    extra += (1 + dwidth(trail)) if trail else 0
+    cells = max(8, min(60, (W - 3) - fixed - extra))
+
+    pct_txt = GL["none"] if pct is None else "%d%%" % int(round(pct))
+    spk = paint(ramp_at(LOAD_RAMP, (pct or 0) / 100.0), spark(trend, 4)) if trend else None
+    if trail:
+        spk = ((spk + " ") if spk else "") + paint(PAL["dim"], trail)
+    return gauge("", None if pct is None else clamp01(pct / 100.0),
+                 pct_txt, LOAD_RAMP, spk, cells, pct)
 
 
 P_AGENT, P_WT, P_BRANCH, P_DIRTY, P_CG = 1, 1, 2, 2, 3
@@ -631,18 +588,13 @@ def build_place(d, W):
                 "REPLACE": PAL["red"]}.get(str(vm).upper(), PAL["sub"])
         add(P_VIM, pill(str(vm).upper()[:7], tone))
 
-    tok = (fnum(dig(d, "context_window.total_input_tokens"), 0) or 0) \
-        + (fnum(dig(d, "context_window.total_output_tokens"), 0) or 0)
-    if tok > 0:
-        add(P_TOKENS, paint(PAL["dim"], compact_tokens(tok)))
+    wall = (fnum(dig(d, "cost.total_duration_ms"), 0) or 0) / 1000.0
+    if wall >= 60:
+        add(P_TOKENS, paint(PAL["dim"], elapsed(wall)))
 
     style = dig(d, "output_style.name")
     if style and style != "default":
         add(P_MINOR, paint(PAL["dim"], trunc(str(style), 12)))
-
-    sn = d.get("session_name")
-    if sn:
-        add(P_MINOR, paint(PAL["sub"], trunc(str(sn), 16)))
 
     add(0, pill("PONYTAIL", PAL["pink"]))
 

@@ -1,27 +1,21 @@
 # statusline
 
-A Claude Code status line built as **instrumentation for the current session** — two lines, three matched meters, no noise.
+A Claude Code status line built as **instrumentation for the current session** — two lines, one meter, no noise.
 
 ```
-◆ Opus 5 1M · ▇ xhigh ·  claude-tools · ⎇ main ⇡2 ⇣ · ±7 · +312 -87 · ⬡ ok · PR#42 ● · 167k · PONYTAIL
-CONTEXT ███████▌░░░░  63% ⣀⣀⣰⣶ │   CACHE ███████████▏  93%  38m │    WAIT ██▋░░░░░░░░░  22%  30m
+◆ Opus 5 1M · ▇ xhigh ·  claude-tools · ⎇ main ⇡2 ⇣ · ±7 · +312 -87 · ⬡ ok · PR#42 ● · 30m · PONYTAIL
+████████████████████████████████████▊░░░░░░░░░░░░░░░░░░░░░░  63% ⣀⣀⣰⣶ 167k/1M
 ```
 
-**Line 1 — where you are.** Model, context window size, reasoning effort, thinking/fast mode, subagent or worktree, directory, branch with ahead/behind, changed-file count, lines added/removed, codegraph index state, open PR with review state, session tokens.
+**Line 1 — where you are.** Model, context window size, reasoning effort, thinking/fast mode, subagent or worktree, directory, branch with ahead/behind, changed-file count, lines added/removed, codegraph index state, open PR with review state, elapsed time.
 
-**Line 2 — three gauges, same width, so you compare them by shape.**
+**Line 2 — how full the context window is,** and nothing else. One wide meter, the percentage, a braille trend showing how fast the window is filling, and tokens used against the window size.
 
-| Gauge | Reads | Trailing | Why you'd look |
-|-------|-------|----------|----------------|
-| `CONTEXT` | how full the context window is | braille trend — how fast it is filling | when to wrap up or compact |
-| `CACHE` | prompt-cache hit ratio — how much of the conversation Claude re-reads from cache instead of re-sending | time until the cached prefix goes cold, or `cold` | high means faster, cheaper turns; a drop means something invalidated the cache |
-| `WAIT` | share of session wall time spent waiting on the model rather than on you | session duration | whether the session is model-bound or you-bound |
-
-Meters fill in **eighth-blocks**, so a bar has eight times the resolution of its character count, and the fill is a green→yellow→red gradient (blue→teal→peach for the cache and API gauges, where "high" isn't "bad").
+The meter fills in **eighth-blocks**, so it carries eight times the resolution of its character count, on a green→yellow→red gradient. It takes the full width up to 60 cells, and the label is gone because a bar that colour, in that place, needs no caption.
 
 ## Scope: this session only
 
-No spend, no 5-hour window, no 7-day window. Those are account-level and Orca already shows them; repeating them here would be noise. Everything on both lines describes the session in front of you.
+No spend, no 5-hour window, no 7-day window — those are account-level and Orca already shows them. No prompt-cache or API-wait gauges either: if a number needs a caption to be understood, it isn't glanceable. Everything on both lines describes the session in front of you.
 
 ## Install
 
@@ -41,7 +35,7 @@ Needs Python 3 (stdlib only — no `jq`, no dependencies). Restart Claude Code a
 | `SL_NO_NERD` | `0` | Keep Unicode but drop Nerd Font icons. |
 | `NO_COLOR` | unset | Monochrome. |
 
-The layout is responsive: it drops the gauge trailers below ~90 columns, then shrinks the meters, then falls back to bare percentages. Line 1 sheds segments by priority — the model, directory and PONYTAIL badge are the last to go.
+The layout is responsive: the meter shrinks to fit the width, and line 1 sheds segments by priority — the model, directory and PONYTAIL badge are the last to go.
 
 ### Animation (off by default)
 
