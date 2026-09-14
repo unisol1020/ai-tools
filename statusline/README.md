@@ -4,7 +4,7 @@ A quiet, two-line Claude Code status line scoped to **the current session**.
 
 ```
  claude-tools    statusline-and-config ±28 ↑2   +2822 −62    #42 ●
-◆ Fable 5.1 1M   xhigh   43m   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 29%  294k   PONYTAIL
+󰙴 Fable 5.1 1M   󰧑 xhigh   43m   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 29%  294k   PONYTAIL
 ```
 
 **Line 1 — where you are.** Directory, branch (with changed-file count and ahead/behind when non-zero), lines added and removed this session, the open PR and its review state. A worktree or subagent name appears here when you're in one; a stale codegraph index shows as `graph ~12`.
@@ -46,7 +46,7 @@ Git state is cached 5 s and the codegraph probe 30 s, keyed per directory so swi
 
 ## Credits
 
-- Started from [kcchien/claude-code-statusline](https://github.com/kcchien/claude-code-statusline) (MIT) — the brand diamond and the habit of hiding zero-valued segments survive from there.
+- Started from [kcchien/claude-code-statusline](https://github.com/kcchien/claude-code-statusline) (MIT) — the habit of hiding zero-valued segments survives from there.
 - Palette is [Catppuccin Mocha](https://github.com/catppuccin/catppuccin).
 - Icons need a [Nerd Font](https://www.nerdfonts.com/); without one, set `SL_NO_NERD=1`.
 - Payload reference: [Claude Code status line docs](https://code.claude.com/docs/en/statusline).

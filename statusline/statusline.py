@@ -2,7 +2,7 @@
 """Claude Code status line — quiet, session-scoped, two lines.
 
    claude-tools    statusline-and-config ±27 ↑2   +2822 −62    #42 ●
-  ◆ Opus 5 1M   xhigh   43m   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 29%  294k   PONYTAIL
+  󰙴 Opus 5 1M   󰧑 xhigh   43m   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 29%  294k   PONYTAIL
 
 Line 1 is where you are: directory, branch, working-tree changes, lines this
 session, open PR. Line 2 is the session: model, effort, elapsed, context.
@@ -51,10 +51,11 @@ MAUVE = (203, 166, 247)
 PINK = (245, 194, 231)
 
 if ASCII:
-    G = dict(brand="*", dir="", branch="", pr="PR", fork="wt", up="^", down="v",
+    G = dict(brand="*", effort="", dir="", branch="", pr="PR", fork="wt", up="^", down="v",
              delta="~", dot="*", fill="=", rest="-", gap="   ")
 else:
-    G = dict(brand="◆", dir=" " if NERD else "", branch=" " if NERD else "⎇ ",
+    G = dict(brand="󰙴" if NERD else "✦", effort="󰧑 " if NERD else "",
+             dir=" " if NERD else "", branch=" " if NERD else "⎇ ",
              pr=" " if NERD else "PR ", fork=" " if NERD else "⚇ ",
              up="↑", down="↓", delta="±", dot="●",
              fill="━", rest="─", gap="   ")
@@ -317,7 +318,7 @@ def session_line(d):
 
     eff = dig(d, "effort.level")
     if eff:
-        segs.append([2, paint(SUB, str(eff))])
+        segs.append([2, paint(OVER, G["effort"]) + paint(SUB, str(eff))])
     if d.get("fast_mode"):
         segs.append([2, paint(YELLOW, "fast")])
 
