@@ -1,0 +1,59 @@
+{
+  "env": {
+    "CCGUI_CLI_LOGIN_AUTHORIZED": "1",
+    "CAVEMAN_STATUSLINE_SAVINGS": "0"
+  },
+  "permissions": {
+    "allow": [
+      "mcp__codegraph__codegraph_explore",
+      "mcp__codegraph__codegraph_search",
+      "mcp__codegraph__codegraph_node",
+      "mcp__codegraph__codegraph_callers",
+      "mcp__codegraph__codegraph_callees",
+      "mcp__codegraph__codegraph_impact",
+      "mcp__codegraph__codegraph_files",
+      "mcp__codegraph__codegraph_status"
+    ],
+    "defaultMode": "bypassPermissions"
+  },
+  "effortLevel": "xhigh",
+  "ultracode": true,
+  "tui": "fullscreen",
+  "theme": "dark",
+  "voice": {
+    "enabled": false,
+    "mode": "hold"
+  },
+  "voiceEnabled": false,
+  "autoCompactEnabled": true,
+  "autoContinueAtUsageLimit": true,
+  "agentPushNotifEnabled": true,
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true,
+    "ponytail@ponytail": true,
+    "posthog@claude-plugins-official": true,
+    "vercel@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "cmux-hub-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "azu/cmux-hub"
+      }
+    },
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
+    },
+    "ast-grep-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "ast-grep/agent-skill"
+      }
+    }
+  }
+}
