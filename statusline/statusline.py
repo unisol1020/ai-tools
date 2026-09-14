@@ -2,18 +2,19 @@
 """Claude Code status line — quiet, session-scoped, two lines.
 
    claude-tools    statusline-and-config ±27 ↑2   +2822 −62    #42 ●
-  ◆ Opus 5 1M   xhigh   43m   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 29%  294k   ponytail
+  ◆ Opus 5 1M   xhigh   43m   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 29%  294k   PONYTAIL
 
 Line 1 is where you are: directory, branch, working-tree changes, lines this
 session, open PR. Line 2 is the session: model, effort, elapsed, context.
 
 Nothing account-level (no spend, no rate limits) and nothing that needs a
-caption. Two greys and one accent; red, green and peach only where they mean
-something. Whitespace separates groups — no dots, no pills, no filler.
+caption. Two greys and one accent; colour only where it means something — the
+meter runs green to 50 %, yellow to 70 %, red beyond, and the % follows it.
+Whitespace separates groups. One pink badge, no filler.
 
 Env:  SL_WIDTH  column budget (default: detected, else 110)
       SL_ASCII  1 → plain ASCII      SL_NO_NERD  1 → no Nerd Font icons
-      SL_GAP    0 → no spacer row    NO_COLOR    → monochrome
+      SL_GAP    1 → spacer row       NO_COLOR    → monochrome
 """
 import hashlib
 import json
@@ -47,6 +48,7 @@ PEACH = (250, 179, 135)
 RED = (243, 139, 168)
 YELLOW = (249, 226, 175)
 MAUVE = (203, 166, 247)
+PINK = (245, 194, 231)
 
 if ASCII:
     G = dict(brand="*", dir="", branch="", pr="PR", fork="wt", up="^", down="v",
@@ -72,6 +74,32 @@ def fg(rgb):
     if MONO:
         return ""
     return "\x1b[38;2;%d;%d;%dm" % rgb if TRUE else "\x1b[38;5;%dm" % x256(rgb)
+
+
+def bg(rgb):
+    if MONO:
+        return ""
+    return "\x1b[48;2;%d;%d;%dm" % rgb if TRUE else "\x1b[48;5;%dm" % x256(rgb)
+
+
+def pill(text, tone, ink=(17, 17, 27)):
+    if ASCII or not NERD:
+        return paint(tone, "[%s]" % text, True)
+    if MONO:
+        return "[%s]" % text
+    return (fg(tone) + "\ue0b6" + bg(tone) + fg(ink) + "\x1b[1m" + text
+            + "\x1b[0m" + fg(tone) + "\ue0b4" + "\x1b[0m")
+
+
+def ramp(t):
+    """Meter colour by position: green to 50 %, yellow to 70 %, red beyond."""
+    stops = [(0.0, GREEN), (0.5, YELLOW), (0.7, RED), (1.0, RED)]
+    t = max(0.0, min(1.0, t))
+    for (t0, c0), (t1, c1) in zip(stops, stops[1:]):
+        if t <= t1:
+            k = 0.0 if t1 == t0 else (t - t0) / (t1 - t0)
+            return tuple(int(round(c0[i] + (c1[i] - c0[i]) * k)) for i in range(3))
+    return RED
 
 
 def paint(rgb, s, bold=False):
@@ -300,11 +328,11 @@ def session_line(d):
     pct = fnum(dig(d, "context_window.used_percentage"))
     if pct is not None:
         pct = max(0.0, min(100.0, pct))
-        tone = RED if pct >= 90 else PEACH if pct >= 70 else LAV
         cells = 32
         n = int(round(pct / 100.0 * cells))
-        bar = paint(tone, G["fill"] * n) + paint(SURF, G["rest"] * (cells - n))
-        s = bar + " " + paint(tone if pct >= 70 else SUB, "%d%%" % int(round(pct)))
+        bar = "".join(fg(ramp((i + 0.5) / cells)) + G["fill"] for i in range(n))
+        bar += paint(SURF, G["rest"] * (cells - n))
+        s = bar + " " + paint(ramp(pct / 100.0), "%d%%" % int(round(pct)))
         used = (fnum(dig(d, "context_window.total_input_tokens"), 0) or 0) \
             + (fnum(dig(d, "context_window.total_output_tokens"), 0) or 0)
         if used:
@@ -315,7 +343,7 @@ def session_line(d):
     if vm:
         segs.append([4, paint(SUB, str(vm).lower())])
 
-    segs.append([5, paint(OVER, "ponytail")])
+    segs.append([5, pill("PONYTAIL", PINK)])
     return segs
 
 
@@ -346,7 +374,7 @@ def main():
     top = fit(place_line(d, cwd), width)
     bottom = fit(session_line(d), width)
     # Claude Code drops empty rows; a zero-width space survives a trim() and draws nothing.
-    spacer = "\n​" if os.environ.get("SL_GAP", "1") == "1" else ""
+    spacer = "\n​" if os.environ.get("SL_GAP", "0") == "1" else ""
     write(top + spacer + "\n" + bottom)
 
 
