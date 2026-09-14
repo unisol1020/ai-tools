@@ -51,12 +51,12 @@ MAUVE = (203, 166, 247)
 PINK = (245, 194, 231)
 
 if ASCII:
-    G = dict(brand="*", effort="", dir="", branch="", pr="PR", fork="wt", up="^", down="v",
+    G = dict(brand="* ", effort="", dir="", branch="", pr="PR", fork="wt", up="^", down="v",
              delta="~", dot="*", fill="=", rest="-", gap="   ")
 else:
-    G = dict(brand="󰙴" if NERD else "✦", effort="󰧑 " if NERD else "",
-             dir=" " if NERD else "", branch=" " if NERD else "⎇ ",
-             pr=" " if NERD else "PR ", fork=" " if NERD else "⚇ ",
+    G = dict(brand="󰙴  " if NERD else "✦ ", effort="󰧑  " if NERD else "",
+             dir="  " if NERD else "", branch="  " if NERD else "⎇ ",
+             pr="  " if NERD else "PR ", fork="  " if NERD else "⚇ ",
              up="↑", down="↓", delta="±", dot="●",
              fill="━", rest="─", gap="   ")
 
@@ -310,7 +310,7 @@ def session_line(d):
     segs = []
     name = re.sub(r"\s*\(.*?\)\s*$", "", dig(d, "model.display_name") or "").strip()
     name = re.sub(r"^Claude\s+", "", name) or "Claude"
-    head = paint(BRAND, G["brand"]) + " " + paint(TEXT, trunc(name, 18), True)
+    head = paint(BRAND, G["brand"]) + paint(TEXT, trunc(name, 18), True)
     size = fnum(dig(d, "context_window.context_window_size"), 0) or 0
     if size >= 1_000_000:
         head += " " + paint(OVER, "1M")
