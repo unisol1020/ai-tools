@@ -2,7 +2,7 @@
 """Claude Code status line — at-a-glance instrumentation, current session only.
 
 Line 1  identity / place / repo state
-Line 2  one wide context meter (eighth-block sub-cell fill), its trend, and tokens
+Line 2  a compact context meter (eighth-block sub-cell fill) and session tokens
 
 Scope is deliberately this session: no spend, no 5h/7d rate-limit windows —
 Orca already surfaces those.
@@ -465,7 +465,7 @@ def elapsed(seconds):
 
 
 def build_gauges(d, W, trend):
-    """One full-width context meter — the only number worth a gauge of its own."""
+    """A compact context meter. Small on purpose — it sits under a dense line."""
     cw = d.get("context_window") or {}
     pct = fnum(cw.get("used_percentage"))
     size = fnum(cw.get("context_window_size")) or 0
@@ -485,17 +485,11 @@ def build_gauges(d, W, trend):
     elif tok > 0:
         trail = compact_tokens(tok)
 
-    fixed = 1 + 4  # gap, "100%"
-    extra = (1 + 4) if trend else 0                 # braille trend
-    extra += (1 + dwidth(trail)) if trail else 0
-    cells = max(8, min(60, (W - 3) - fixed - extra))
-
+    cells = max(8, min(20, (W - 3) - 5 - (1 + dwidth(trail) if trail else 0)))
     pct_txt = GL["none"] if pct is None else "%d%%" % int(round(pct))
-    spk = paint(ramp_at(LOAD_RAMP, (pct or 0) / 100.0), spark(trend, 4)) if trend else None
-    if trail:
-        spk = ((spk + " ") if spk else "") + paint(PAL["dim"], trail)
+    extra = paint(PAL["dim"], trail) if trail else None
     return gauge("", None if pct is None else clamp01(pct / 100.0),
-                 pct_txt, LOAD_RAMP, spk, cells, pct)
+                 pct_txt, LOAD_RAMP, extra, cells, pct)
 
 
 P_AGENT, P_WT, P_BRANCH, P_DIRTY, P_CG = 1, 1, 2, 2, 3
@@ -630,16 +624,12 @@ def main():
         d = {}
     W = max(40, min(400, term_width()))
 
-    pct = fnum(dig(d, "context_window.used_percentage"))
-    sid = str(d.get("session_id") or dig(d, "workspace.current_dir") or d.get("cwd") or "anon")
-    try:
-        trend = trend_push(sid, pct)
-    except Exception:
-        trend = []
+    trend = []
 
     l1 = build_place(d, W)
     l2 = build_gauges(d, W, trend)
-    write(l1 + "\n" + l2)
+    gap = "\n\n" if os.environ.get("SL_GAP", "1") == "1" else "\n"
+    write(l1 + gap + l2)
 
 
 def write(text):

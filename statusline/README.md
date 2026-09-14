@@ -4,14 +4,15 @@ A Claude Code status line built as **instrumentation for the current session** �
 
 ```
 ◆ Opus 5 1M · ▇ xhigh ·  claude-tools · ⎇ main ⇡2 ⇣ · ±7 · +312 -87 · ⬡ ok · PR#42 ● · 30m · PONYTAIL
-████████████████████████████████████▊░░░░░░░░░░░░░░░░░░░░░░  63% ⣀⣀⣰⣶ 167k/1M
+
+████████████▋░░░░░░░  63% 167k/1M
 ```
 
 **Line 1 — where you are.** Model, context window size, reasoning effort, thinking/fast mode, subagent or worktree, directory, branch with ahead/behind, changed-file count, lines added/removed, codegraph index state, open PR with review state, elapsed time.
 
-**Line 2 — how full the context window is,** and nothing else. One wide meter, the percentage, a braille trend showing how fast the window is filling, and tokens used against the window size.
+**Line 2 — how full the context window is,** and nothing else: the meter, the percentage, and tokens used against the window size. A blank row separates it from the dense line above.
 
-The meter fills in **eighth-blocks**, so it carries eight times the resolution of its character count, on a green→yellow→red gradient. It takes the full width up to 60 cells, and the label is gone because a bar that colour, in that place, needs no caption.
+The meter fills in **eighth-blocks**, so it carries eight times the resolution of its twenty characters, on a green→yellow→red gradient. It stays small on purpose — it sits under a busy line, and a full-width bar swamps it. There is no label, because a bar that colour, in that place, needs no caption.
 
 ## Scope: this session only
 
@@ -34,6 +35,7 @@ Needs Python 3 (stdlib only — no `jq`, no dependencies). Restart Claude Code a
 | `SL_ASCII` | `0` | Pure ASCII — no block glyphs, no icons. Also turns on automatically when the locale isn't UTF-8. |
 | `SL_NO_NERD` | `0` | Keep Unicode but drop Nerd Font icons. |
 | `NO_COLOR` | unset | Monochrome. |
+| `SL_GAP` | `1` | Blank row between the two lines. Set `0` to reclaim the terminal row. |
 
 The layout is responsive: the meter shrinks to fit the width, and line 1 sheds segments by priority — the model, directory and PONYTAIL badge are the last to go.
 
