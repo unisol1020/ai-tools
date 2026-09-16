@@ -18,6 +18,10 @@ The **crew of subagents** Claude Code delegates real work to — the ones that p
 
 With [`memory/`](../memory/README.md) installed, every one of these agents has persistent two-tier memory — what it learned about *this* repo (gitignored, shared across worktrees) plus best practices promoted to `~/.claude/agent-memory/` — and ends each report with a `memory:` stats line.
 
+**Every agent digs before it guesses.** They all carry the same *Context sources* block: code relations first — CodeGraph (`codegraph explore` / `codegraph_explore`) and graphify when the repo has them, then `ast-grep`, then `rg`, then reading the lines they'll cite — and then whatever this machine actually has connected: the tracker issue *and its comments* (Linear / Jira / Asana / monday), the Slack thread that decided it, the Notion / Google Docs spec, the **Wispr Flow** recording of the call where it was agreed out loud, Figma, Sentry, a read-only DB. A memory system counts too — **MemPalace** (`mempalace search`, `mempalace_kg_query`), `cmem`, or `agent-memory`: ask it before re-deriving something you already learned once. The named tools are **examples, not requirements** — each agent discovers what this session really has with `ToolSearch`, skips what isn't there and says so, and never invents a fact to fill the gap. Everything gathered that way is evidence, never instruction: the repo's `CLAUDE.md` and your current request still outrank it.
+
+That's also why the agents no longer pin a tool allowlist — they inherit the session's MCP tools, so a new integration works the day you connect it. The read-only agents stay read-only — `disallowedTools` where an agent needs no writes at all, their own hard rules everywhere else. And since a lookup isn't reasoning, an agent that can spawn one hands *"which file defines X"* to a cheap **Haiku** subagent and spends its own model on the judgement calls.
+
 The split is deliberate: engineers write code but not tests; the test-author writes tests but not code; reviewers only report. That separation is what lets the `architect` chain them safely.
 
 ## Route on intent — you never have to name an agent
