@@ -25,7 +25,7 @@ FILE_CAP=4096
 DESC_CAP=140
 CTX_GLOBAL_LINES=20
 CTX_SHARED_LINES=15
-SECRET_RE='AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{20,}|ghp_|xox[baprs]-|Bearer [A-Za-z0-9._-]{20,}|password=|://[^/[:space:]:]+:[^@[:space:]]+@'
+SECRET_RE='AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{20,}|ghp_|xox[baprs]-|Bearer [A-Za-z0-9._-]{20,}|password=[^$<{[:space:]]{4,}|token=[A-Za-z0-9._-]{8,}|[?&](key|secret|token)=[A-Za-z0-9._-]{8,}|://[^/[:space:]:]+:[^@[:space:]]+@'
 CWD=$PWD
 IN=""
 
@@ -94,7 +94,10 @@ agent_file() {
   return 1
 }
 has_memory() { f=$(agent_file "$1") && [ "$(fm "$f" memory)" = local ]; }
-safe_name() { case $1 in ''|*[!A-Za-z0-9_-]*) return 1;; esac; }
+# Claude Code names the memory dir after the sanitized agent type and a plugin-scoped agent arrives
+# as "<plugin>:<name>", so mirror both rules or the hooks silently skip that agent's memory.
+mem_name() { printf '%s' "$1" | sed 's/[^A-Za-z0-9_-]/-/g'; }
+def_name() { d=${1##*:}; case $d in ''|*[!A-Za-z0-9_-]*) return 1;; esac; printf '%s' "$d"; }
 memory_agents() {
   for f in "$CLAUDE_DIR"/agents/*.md "$TOP"/.claude/agents/*.md; do
     [ -f "$f" ] && [ "$(fm "$f" memory)" = local ] && basename "$f" .md
@@ -125,10 +128,21 @@ link_local() {  # make <base>/.claude/agent-memory-local a symlink to $PROJ, mer
   fi
   [ "$(readlink "$wt" 2>/dev/null)" = "$PROJ" ] || { rm -f "$wt"; ln -s "$PROJ" "$wt"; }
 }
+exclude_project_dir() {
+  git -C "$MAIN" check-ignore -q .claude/agent-memory-local 2>/dev/null && return 0
+  ex=$(git -C "$MAIN" rev-parse --path-format=absolute --git-path info/exclude 2>/dev/null)
+  case "$ex" in /*) ;; *) return 0;; esac
+  grep -qxF '.claude/agent-memory-local/' "$ex" 2>/dev/null && return 0
+  mkdir -p "$(dirname "$ex")" 2>/dev/null || return 0
+  [ -s "$ex" ] && [ -n "$(tail -c1 "$ex")" ] && echo >> "$ex"
+  echo '.claude/agent-memory-local/' >> "$ex" 2>/dev/null
+  return 0
+}
 cmd_ensure() {
   mkdir -p "$PROJ/_shared" "$PROJ/_skills" "$CURATOR" "$GLOBAL/_skills" || return 1
   names="$*"; [ -n "$names" ] || names=$(memory_agents)
   for a in $names; do mkdir -p "$PROJ/$a" "$GLOBAL/$a"; done
+  exclude_project_dir
   # The harness resolves `memory: local` against the session cwd, so a worktree and a subdirectory launch both need the link.
   rm_main=$(real "$MAIN")
   for base in "$TOP" "$(real "$CWD")"; do
@@ -342,26 +356,34 @@ cmd_session_start() {
 }
 cmd_subagent_start() {
   hook_setup || return 0
-  agent=$(jval .agent_type); safe_name "$agent" || return 0
-  if [ "$agent" = memory-curator ]; then cmd_ensure; ctx=$(cmd_report)
-  elif has_memory "$agent"; then ctx=$(cmd_context --agent "$agent") || return 1
+  agent=$(jval .agent_type); def=$(def_name "$agent") || return 0; mem=$(mem_name "$agent")
+  if [ "$def" = memory-curator ]; then cmd_ensure; ctx=$(cmd_report)
+  elif has_memory "$def"; then ctx=$(cmd_context --agent "$mem") || return 1
   else return 0; fi
   printf '%s' "$ctx" | jq -Rs '{hookSpecificOutput:{hookEventName:"SubagentStart",additionalContext:.}}'
 }
 cmd_subagent_stop() {
   hook_setup || return 0
-  agent=$(jval .agent_type); safe_name "$agent" || return 0
+  agent=$(jval .agent_type); def=$(def_name "$agent") || return 0; mem=$(mem_name "$agent")
   msg=$(jval .last_assistant_message)
-  if [ "$agent" = memory-curator ]; then
+  if [ "$def" = memory-curator ]; then
     # A curator spawned by /evolve --all for another repo reports that repo's slug; its stop must not release this repo's lock.
     case $msg in *"memory-curator: "*) printf '%s' "$msg" | grep -qF "memory-curator: $SLUG" || return 0;; esac
     cmd_curator_done; return 0
   fi
-  has_memory "$agent" || return 0
-  pdir="$PROJ/$agent"; n=$(nonblank "$pdir/inbox.md")
-  if [ "$n" -ge 1 ] && [ "$(jval .stop_hook_active)" != true ]; then
-    jq -n --arg r "Your memory inbox at $pdir/inbox.md still has $n unprocessed lines. Run the End step of your memory protocol now (merge each line into a memory file, delete the line), then finish with the memory: stats line." '{decision:"block",reason:$r}'
-    return 0
+  has_memory "$def" || return 0
+  pdir="$PROJ/$mem"; n=$(nonblank "$pdir/inbox.md")
+  if [ "$(jval .stop_hook_active)" != true ]; then
+    if [ "$n" -ge 1 ]; then
+      jq -n --arg r "Your memory inbox at $pdir/inbox.md still has $n unprocessed lines. Run the End step of your memory protocol now (merge each line into a memory file, delete the line), then finish with the memory: stats line." '{decision:"block",reason:$r}'
+      return 0
+    fi
+    errs=$(lint_dir "$pdir" | grep '^ERROR ' | head -8)
+    if [ -n "$errs" ]; then
+      jq -n --arg r "agent-memory lint failed for $pdir — fix these lines, then finish with the memory: stats line:
+$errs" '{decision:"block",reason:$r}'
+      return 0
+    fi
   fi
   set -- $(printf '%s\n' "$msg" | sed -n 's/.*memory: recalled \([0-9][0-9]*\) used \([0-9][0-9]*\) saved \([0-9][0-9]*\) repeats \([0-9][0-9]*\).*/\1 \2 \3 \4/p' | tail -1)
   [ $# -eq 4 ] || return 0
@@ -403,6 +425,19 @@ cmd_selfcheck() {
   mkdir -p "$repo/apps/web"; run "$repo/apps/web" ensure
   t "ensure links a subdirectory launch to MAIN" test "$(readlink "$repo/apps/web/.claude/agent-memory-local")" = "$proj"
   t "ensure never links MAIN to itself" test ! -L "$proj"
+  t "ensure excludes the project dir from git" g check-ignore -q .claude/agent-memory-local
+  t "ensure writes the exclude into the common dir" grep -qxF '.claude/agent-memory-local/' "$repo/.git/info/exclude"
+  run "$repo" ensure
+  t "ensure adds the exclude line once" test "$(grep -cxF '.claude/agent-memory-local/' "$repo/.git/info/exclude")" = 1
+  t "ensure keeps git status free of the project dir" test -z "$(g status --porcelain -uall -- .claude/agent-memory-local)"
+  t "ensure survives a non-git dir" run "$tmp/acme" ensure
+  tracked="$tmp/tracked"; mkdir -p "$tracked/.claude/agent-memory-local/architect"; echo x > "$tracked/.claude/agent-memory-local/architect/MEMORY.md"
+  git -C "$tracked" init -q && git -C "$tracked" -c user.name=t -c user.email=t@t add -A && git -C "$tracked" -c user.name=t -c user.email=t@t commit -qm init
+  run "$tracked" ensure; run "$tracked" ensure
+  t "ensure adds the exclude line once when the dir is tracked" test "$(grep -cxF '.claude/agent-memory-local/' "$tracked/.git/info/exclude")" = 1
+  bare="$tmp/bare.git"; git init -q --bare "$bare"
+  run "$bare" ensure; run "$bare" ensure
+  t "ensure adds the exclude line at most once in a bare repo" test "$(grep -cxF '.claude/agent-memory-local/' "$bare/info/exclude" 2>/dev/null || echo 0)" -le 1
 
   idx="$tmp/idx dir"; mkdir -p "$idx"
   entry "$idx/a-fact.md" a-fact 2 2026-01-01; entry "$idx/b-fact.md" b-fact 5 2026-01-01
@@ -422,6 +457,10 @@ cmd_selfcheck() {
   ld="$tmp/lint"; mkdir -p "$ld"
   entry "$ld/big.md" big 3 "$TODAY" '' "$(head -c 5000 /dev/zero | tr '\0' x)"
   entry "$ld/sec.md" sec 3 "$TODAY" '' "key AKIAABCDEFGHIJKLMNOP leaked"
+  entry "$ld/magic.md" magic 3 "$TODAY" '' "open https://app.test/login?token=abc123def456 first"
+  entry "$ld/qs.md" qs 3 "$TODAY" '' "call /export?user=1&key=zzzzzzzzzz"
+  entry "$ld/recipe.md" recipe 3 "$TODAY" '' "run gh with --token=\$GH_TOKEN; never the password=<literal> form"
+  entry "$ld/shape.md" shape 3 "$TODAY" '' "login accepts ?token= in the query string; the guard must reject it"
   entry "$ld/old.md" old 2 2020-01-01
   entry "$ld/quoted.md" quoted 2 "\"$TODAY\""
   run "$ld" index "$ld"; echo '- [Gone](gone.md) — vanished' >> "$ld/MEMORY.md"
@@ -430,6 +469,10 @@ cmd_selfcheck() {
   t "lint finds oversized file" grep -q 'big.md — [0-9]* bytes > 4096' <<<"$out"
   t "lint finds dangling index line" grep -q 'missing gone.md' <<<"$out"
   t "lint finds secret" grep -q 'sec.md — secret' <<<"$out"
+  t "lint finds a token= URL" grep -q 'magic.md — secret' <<<"$out"
+  t "lint finds a query-string key" grep -q 'qs.md — secret' <<<"$out"
+  t "lint passes a \$VAR placeholder after token=" not grep -q 'recipe.md — secret' <<<"$out"
+  t "lint passes a bare ?token= parameter name" not grep -q 'shape.md — secret' <<<"$out"
   t "lint finds decay candidate" grep -q 'old.md — decay' <<<"$out"
   t "lint ignores a quoted fresh last_verified" not grep -q 'quoted.md — decay' <<<"$out"
   t "lint --fix returns 0" run "$ld" lint --fix "$ld"
@@ -461,6 +504,8 @@ cmd_selfcheck() {
   t "subagent-start reads a CRLF agent file" grep -q "Memory protocol" <<<"$(hookin "$wt" subagent-start --arg agent_type crlfagent)"
   t "subagent-start is silent for Explore" test -z "$(hookin "$wt" subagent-start --arg agent_type Explore)"
   t "subagent-start ignores a path-like agent_type" test -z "$(hookin "$wt" subagent-start --arg agent_type ../agents/architect)"
+  t "subagent-start serves a plugin-scoped agent type" grep -q "Memory protocol" <<<"$(hookin "$wt" subagent-start --arg agent_type ai-tools:architect | jq -r .hookSpecificOutput.additionalContext)"
+  t "plugin-scoped memory dir mirrors the harness sanitizer" grep -qF "ai-tools-architect" <<<"$(hookin "$wt" subagent-start --arg agent_type ai-tools:architect)"
   t "subagent-start briefs the curator" grep -q "curator briefing" <<<"$(hookin "$repo" subagent-start --arg agent_type memory-curator | jq -r .hookSpecificOutput.additionalContext)"
 
   st=$(hookin "$wt" subagent-stop --arg agent_type architect --argjson stop_hook_active false)
@@ -475,6 +520,12 @@ memory: recalled 3 used 1 saved 1 repeats 0"
   t "subagent-stop appends a stats row" test "$(awk -F '\t' '$2=="a1"&&$3==3&&$4==1&&$5==1&&$6==0' "$proj/architect/stats.tsv" | grep -c .)" = 1
   hookin "$wt" subagent-stop --arg agent_type architect --arg agent_id a2 --argjson stop_hook_active true --arg last_assistant_message "memory: recalled 2 used 0 saved 0 repeats 1"
   t "subagent-stop records stats after a block" test "$(awk -F '\t' '$2=="a2"&&$6==1' "$proj/architect/stats.tsv" | grep -c .)" = 1
+  entry "$proj/architect/leak.md" leak 3 "$TODAY" '' "key AKIAABCDEFGHIJKLMNOP leaked"
+  t "subagent-stop blocks on a lint error" grep -q 'lint failed' <<<"$(hookin "$wt" subagent-stop --arg agent_type architect --argjson stop_hook_active false | jq -r .decision,.reason)"
+  t "subagent-stop never blocks twice on a lint error" test -z "$(hookin "$wt" subagent-stop --arg agent_type architect --arg agent_id a3 --argjson stop_hook_active true --arg last_assistant_message "memory: recalled 1 used 0 saved 0 repeats 0")"
+  t "subagent-stop records stats after a lint block" test "$(awk -F '\t' '$2=="a3"&&$3==1' "$proj/architect/stats.tsv" | grep -c .)" = 1
+  rm "$proj/architect/leak.md"
+  t "subagent-stop does not block a clean dir" test -z "$(hookin "$wt" subagent-stop --arg agent_type architect --argjson stop_hook_active false)"
   hookin "$repo" subagent-stop --arg agent_type memory-curator --arg last_assistant_message "memory-curator: other/repo — merged 0"
   t "curator stop for another repo keeps the lock" test -d "$proj/.curator/lock"
   hookin "$repo" subagent-stop --arg agent_type memory-curator --arg last_assistant_message "memory-curator: acme/my repo — merged 0"
