@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
-# Idempotent environment setup for the ai-tools stack. Installs + configures the
-# extensions the projects here expect — ripgrep, CodeGraph (+ its MCP), graphify (+ its
-# skill), and the ponytail plugin — but ONLY the ones missing. Safe to re-run.
+# Idempotent environment setup for the ai-tools stack. Installs + configures every
+# tool the agents in this repo expect, but ONLY the ones missing. Safe to re-run.
+#
+# Why these and not others — every one of them exists to keep an agent from reading
+# files it doesn't need, which is where the tokens go:
+#   jq        edits settings.json safely (this script and the installers need it)
+#   rg        ripgrep — the Grep tool IS ripgrep; one search costs a fraction of one Read
+#   ast-grep  structural search: one pattern replaces a dozen greps and the reads after them
+#   codegraph symbols + callers + call paths in one call, instead of opening the files
+#   graphify  relations that cross files and apps, from a prebuilt graph
+#   mempalace cross-session memory, so nothing is re-derived next session
+#   ponytail  the laziest-solution-that-works plugin
 #
 # Runnable two ways:
 #   bash ~/.claude/skills/bootstrap/setup-env.sh     # standalone, from a terminal
@@ -14,10 +23,31 @@ ts()   { date +%Y%m%d-%H%M%S; }
 
 echo "Setting up the ai-tools stack (installs only what's missing) ..."
 
-# 1. ripgrep ----------------------------------------------------------------
+# 0. jq — every step below that touches settings.json depends on it -----------
+if have jq; then note "✓ jq already installed"
+elif have brew; then note "installing jq…"; brew install jq >/dev/null 2>&1 && note "✓ jq"
+elif have apt-get; then sudo apt-get install -y jq >/dev/null 2>&1 && note "✓ jq"
+else note "✗ jq missing — the ponytail step and the bootstrap hooks need it (brew install jq)"; fi
+
+# 1. ripgrep — the single biggest token saver: search, then read only the range
 if have rg; then note "✓ ripgrep already installed"
 elif have brew; then note "installing ripgrep…"; brew install ripgrep >/dev/null && note "✓ ripgrep"
+elif have apt-get; then sudo apt-get install -y ripgrep >/dev/null 2>&1 && note "✓ ripgrep"
+elif have cargo; then cargo install ripgrep --locked >/dev/null 2>&1 && note "✓ ripgrep"
 else note "✗ ripgrep missing — install Homebrew or your distro's ripgrep package"; fi
+
+# 1b. ast-grep — structural search; finds route definitions, exported symbols and
+# call sites by shape, so the agent stops reading files to find out where things are.
+if have ast-grep || have sg; then note "✓ ast-grep already installed"
+else
+  note "installing ast-grep…"
+  if   have brew;  then brew install ast-grep >/dev/null 2>&1
+  elif have npm;   then npm i -g @ast-grep/cli >/dev/null 2>&1
+  elif have cargo; then cargo install ast-grep --locked >/dev/null 2>&1
+  fi
+  { have ast-grep || have sg; } && note "✓ ast-grep installed" \
+    || note "✗ ast-grep missing — brew install ast-grep (or npm i -g @ast-grep/cli)"
+fi
 
 # 2. CodeGraph CLI + MCP ----------------------------------------------------
 if have codegraph; then note "✓ codegraph already installed ($(codegraph --version 2>/dev/null))"
@@ -48,11 +78,23 @@ else
   have graphify && note "✓ graphify installed" \
     || note "… graphify not on PATH — add ~/.local/bin (try 'uv tool update-shell'), reopen shell, re-run"
 fi
-# Register the graphify skill into Claude Code (gives the /graphify command).
-if [ -f "$CLAUDE_DIR/skills/graphify/SKILL.md" ]; then note "✓ graphify skill already installed"
-elif have graphify; then
-  graphify install >/dev/null 2>&1 && note "✓ graphify skill installed (/graphify available after restart)" \
-    || note "… run 'graphify install' manually"
+# Register the graphify skill into Claude Code (gives the /graphify command); re-install when the
+# package moved on, since `graphify install` stamps the skill dir with the version it came from.
+graphify_version() {
+  v=$(graphify --version 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)
+  [ -n "$v" ] || v=$(python3 -c 'import importlib.metadata as m; print(m.version("graphifyy"))' 2>/dev/null)
+  printf '%s' "$v"
+}
+if have graphify; then
+  pkg=$(graphify_version); stamp=$(cat "$CLAUDE_DIR/skills/graphify/.graphify_version" 2>/dev/null || true)
+  if [ -f "$CLAUDE_DIR/skills/graphify/SKILL.md" ] && [ -n "$stamp" ] && [ "$stamp" = "$pkg" ]; then
+    note "✓ graphify skill already installed ($stamp)"
+  elif [ -f "$CLAUDE_DIR/skills/graphify/SKILL.md" ] && [ -z "$pkg" ]; then
+    note "✓ graphify skill already installed (package version unknown — 'graphify install' refreshes it)"
+  else
+    graphify install >/dev/null 2>&1 && note "✓ graphify skill installed ${pkg:+$pkg }(/graphify available after restart)" \
+      || note "… run 'graphify install' manually"
+  fi
 fi
 
 # 4. plugin: ponytail (merge marketplace + enable into settings.json) ----------
@@ -128,4 +170,18 @@ if have mempalace && [ -f "$CLAUDE_DIR/skills/bootstrap/mempalace-rules.sh" ]; t
   bash "$CLAUDE_DIR/skills/bootstrap/mempalace-rules.sh"
 fi
 
+echo
+echo "Toolchain status:"
+for t in jq rg ast-grep codegraph graphify mempalace; do
+  if have "$t" || { [ "$t" = ast-grep ] && have sg; }; then note "✓ $t"; else note "✗ $t — MISSING, the agents will fall back to reading files (slower + more tokens)"; fi
+done
+# The wiring fails more quietly than the binaries do, so report it separately.
+[ -f "$CLAUDE_DIR/skills/graphify/SKILL.md" ] && note "✓ graphify skill" || note "✗ graphify skill — run 'graphify install'"
+if have jq && jq -e '.enabledPlugins["ponytail@ponytail"] == true' "$CLAUDE_DIR/settings.json" >/dev/null 2>&1
+  then note "✓ ponytail plugin enabled"; else note "✗ ponytail plugin not enabled in settings.json"; fi
+if have claude && claude mcp list 2>/dev/null | grep -q '^codegraph'; then note "✓ codegraph MCP"; else note "✗ codegraph MCP — run 'codegraph install -y'"; fi
+if have claude && claude mcp list 2>/dev/null | grep -q '^mempalace'; then note "✓ mempalace MCP"; else note "✗ mempalace MCP — run 'claude mcp add --scope user mempalace -- mempalace-mcp'"; fi
+if have jq && jq -e '[.hooks[]?[]?.hooks[]?.command // ""] | any(contains("mempalace"))' "$CLAUDE_DIR/settings.json" >/dev/null 2>&1
+  then note "✓ mempalace capture hooks"; else note "✗ mempalace capture hooks not wired"; fi
+echo
 echo "Done. Restart Claude Code once so the ponytail plugin + CodeGraph/MemPalace MCP load."

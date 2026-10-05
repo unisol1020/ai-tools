@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: One command to make a repo (and a fresh machine) fully ready for this Claude Code setup. Installs and configures the required extensions if they're missing — ripgrep, CodeGraph + its MCP, graphify, and the ponytail plugin — then builds the CodeGraph index, optionally builds the graphify knowledge graph, augments CLAUDE.md, and records the repo as bootstrapped so the session-start nudge stops. Use when onboarding a project or a teammate's machine, when the session-start hook says the repo isn't bootstrapped, or when the user runs /bootstrap.
+description: One command to make a repo (and a fresh machine) fully ready for this Claude Code setup. Installs and configures every tool the agents expect if they're missing — jq, ripgrep, ast-grep, CodeGraph + its MCP, graphify, MemPalace + its MCP and capture hooks, and the ponytail plugin — then builds the CodeGraph index, optionally builds the graphify knowledge graph, augments CLAUDE.md, and records the repo as bootstrapped so the session-start nudge stops. Use when onboarding a project or a teammate's machine, when the session-start hook says the repo isn't bootstrapped, or when the user runs /bootstrap.
 ---
 
 # bootstrap — one-command project + environment setup
@@ -9,9 +9,13 @@ Run this to take a repo (and a fresh machine) from nothing to fully set up for t
 
 ## What it sets up
 
-- **ripgrep** (`rg`) — fast search.
-- **CodeGraph** — the `@colbymchenry/codegraph` CLI + its MCP server in Claude Code, then a built index of this repo.
-- **graphify** — the `graphifyy` PyPI package (provides the `graphify` CLI; Python 3.10+, installed via uv/pipx) + the `/graphify` skill, plus an optional **per-commit auto-sync** that keeps the graph fresh with zero tokens.
+Most of this list exists for one reason: **an agent that can search, query a graph or recall memory does not have to read files, and reading files is where the tokens go.** Install all of it — every missing tool is work the agent does the expensive way instead.
+
+- **jq** — used by these installers to edit `~/.claude/settings.json` safely. Several steps below are skipped without it.
+- **ripgrep** (`rg`) — the `Grep` tool *is* ripgrep. One search costs a fraction of one Read, so the agents search first and read only the matching range.
+- **ast-grep** — structural search. One pattern finds every route definition, exported symbol or call site by shape, replacing a dozen greps and the reads that follow them.
+- **CodeGraph** — the `@colbymchenry/codegraph` CLI + its MCP server in Claude Code, then a built index of this repo. `codegraph explore` returns the relevant symbols' source *plus the call paths between them* in one call — the single biggest saving on any "what does this touch" question.
+- **graphify** — the `graphifyy` PyPI package (provides the `graphify` CLI; Python 3.10+, installed via uv/pipx) + the `/graphify` skill, plus an optional **per-commit auto-sync** that keeps the graph fresh with zero tokens. `graphify query|explain|path` answers relations that cross files and apps without opening any of them.
 - **ponytail** — the ponytail Claude Code plugin (lazy-senior-dev mode: YAGNI, stdlib-first, fewest lines).
 - **MemPalace** — the [MemPalace](https://github.com/MemPalace/mempalace) memory engine (`mempalace` PyPI package, installed via uv/pipx) + its MCP server + its **automatic capture hooks** (`SessionStart` loads memory, `Stop`/`SessionEnd`/`PreCompact` save it). Stores verbatim text with **local embeddings — no API key, no per-session LLM call, no quota to exhaust**.
   The hooks are the part that makes memory automatic. The MCP alone only exposes tools the model *may* call; without the hooks nothing is saved on its own.
@@ -33,7 +37,7 @@ If the command is missing, skip this section.
    ```bash
    bash ~/.claude/skills/bootstrap/setup-env.sh
    ```
-   Relay what it installed vs what was already there. It handles ripgrep, the CodeGraph CLI + MCP, graphify + its skill, MemPalace + its MCP, and writes the ponytail plugin into `~/.claude/settings.json`. The plugin + the CodeGraph/MemPalace MCPs only surface after a **Claude Code restart** — note that for the end.
+   Relay what it installed vs what was already there. It handles jq, ripgrep, ast-grep, the CodeGraph CLI + MCP, graphify + its skill, MemPalace + its MCP and its capture hooks + recall rules, and writes the ponytail plugin into `~/.claude/settings.json`. The plugin + the CodeGraph/MemPalace MCPs only surface after a **Claude Code restart** — note that for the end.
 
 3. **Build the CodeGraph index.** If `$root/.codegraph/` doesn't exist:
    - **Large repo** (lots of files / a big monorepo)? **Ask first** — indexing can take a while and spins up workers. On confirm (or for a normal-size repo): `codegraph init "$root"`.

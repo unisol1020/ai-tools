@@ -4,7 +4,8 @@
 # into settings.json. Idempotent; backs up settings before editing.
 #
 # Flags:
-#   --with-deps   also run setup-env.sh now (install ripgrep / CodeGraph / graphify / ponytail)
+#   --with-deps   also run setup-env.sh now (jq, ripgrep, ast-grep, CodeGraph + MCP,
+#                 graphify + skill, MemPalace + MCP + hooks, ponytail)
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,7 +41,7 @@ if command -v jq >/dev/null 2>&1; then
     (if ($c | any(contains("bootstrap-check.sh"))) then .
        else .hooks.SessionStart += [{hooks:[{type:"command", command:$nudge, timeout:10}]}] end) |
     ([ .hooks.SessionStart[]?.hooks[]?.command ]) as $c2 |
-    (if ($c2 | any(contains("codegraph") and contains("sync"))) then .
+    (if ($c2 | any((contains("codegraph") and contains("sync")) or (contains("graphs") and contains("ensure")))) then .
        else .hooks.SessionStart += [{hooks:[{type:"command", command:$sync}]}] end)
   ' "$sj" > "$sj.tmp" && mv "$sj.tmp" "$sj"
   echo "  wired SessionStart hooks (bootstrap nudge + codegraph auto-sync) into settings.json"
@@ -57,9 +58,10 @@ cat <<'DONE'
 
 Done. Next:
   1. Restart Claude Code once (so the skill + any newly-wired hooks load).
-  2. Open any repo and run  /bootstrap  — it installs the required extensions
-     (ripgrep, CodeGraph + MCP, graphify, ponytail) if missing, builds the
-     CodeGraph index, offers to run /graphify, and records the repo as done.
+  2. Open any repo and run  /bootstrap  — it installs every tool the agents expect
+     if missing (jq, ripgrep, ast-grep, CodeGraph + MCP, graphify + skill,
+     MemPalace + MCP + capture hooks, ponytail), builds the CodeGraph index,
+     offers to run /graphify, and records the repo as done.
   Or set up the toolchain right now without opening a repo:
      bash ~/.claude/skills/bootstrap/setup-env.sh
 DONE
