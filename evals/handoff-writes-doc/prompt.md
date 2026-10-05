@@ -1,0 +1,1 @@
+/handoff We were halfway through moving orders sync off the legacy HTTP client: src/orders/client.ts is rewritten, src/orders/sync.ts still imports the old client, and npm test has not been run since. Next step is to update that import and run the tests.

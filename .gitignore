@@ -5,3 +5,8 @@ qa.local.json
 # python build artifacts (e.g. bootstrap graphify-sync template)
 __pycache__/
 *.pyc
+evals/results/
+# the poisoned-memory eval plants a PROJECT tier that Claude Code's info/exclude would otherwise hide
+!evals/*/fixtures/.claude/agent-memory-local/
+# Playwright MCP console/page dumps
+.playwright-mcp/

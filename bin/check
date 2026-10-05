@@ -1,0 +1,55 @@
+#!/bin/sh
+# check — offline lint for the kit: shell syntax, agent-memory selfcheck, handoff and crew-cost tests, the installer test, JSON.
+set -u
+cd "$(dirname "$0")/.." || exit 1
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/ai-tools-check.XXXXXX"); trap 'rm -rf "$tmp"' EXIT
+fail=0
+
+row() { printf '%-4s  %s\n' "$1" "$2"; [ "$1" = FAIL ] && fail=1; }
+indent() { sed 's/^/        /' "$1"; }
+syntax() {
+  case $(head -n 1 "$1") in *bash*) sh=bash;; *) sh=sh;; esac
+  if "$sh" -n "$1" > "$tmp/out" 2>&1; then row PASS "$sh -n $1"; else row FAIL "$sh -n $1"; indent "$tmp/out"; fi
+}
+run() {
+  name=$1; shift
+  if "$@" > "$tmp/out" 2>&1; then row PASS "$name"; else row FAIL "$name"; tail -n 30 "$tmp/out" | sed 's/^/        /'; fi
+}
+
+seen=" "
+for f in */install.sh */bin/* */hooks/*.sh */skills/*/*.sh memory/tests/smoke.sh team/tests/*/run.sh tests/*.sh bin/check; do
+  [ -f "$f" ] || continue
+  case $seen in *" $f "*) continue;; esac
+  seen="$seen$f "
+  syntax "$f"
+done
+
+run "agent-memory selfcheck" /bin/bash memory/bin/agent-memory selfcheck
+
+if [ -f handoff/tests/run.sh ]; then
+  if sh handoff/tests/run.sh > "$tmp/out" 2>&1; then row PASS "handoff/tests/run.sh"; else row FAIL "handoff/tests/run.sh"; fi
+  indent "$tmp/out"
+else
+  row SKIP "handoff/tests/run.sh (not in repo)"
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+  if sh team/tests/crew-cost/run.sh > "$tmp/out" 2>&1; then row PASS "team/tests/crew-cost/run.sh"; else row FAIL "team/tests/crew-cost/run.sh"; fi
+  indent "$tmp/out"
+else
+  row SKIP "team/tests/crew-cost/run.sh (python3 not installed)"
+fi
+
+if sh tests/install.sh > "$tmp/out" 2>&1; then row PASS "tests/install.sh"; else row FAIL "tests/install.sh"; fi
+indent "$tmp/out"
+
+n=0
+find . -name '*.json' -not -path './.git/*' -not -path '*/node_modules/*' > "$tmp/json"
+while IFS= read -r f; do
+  n=$((n + 1))
+  if jq . "$f" > "$tmp/out" 2>&1; then row PASS "jq . $f"; else row FAIL "jq . $f"; indent "$tmp/out"; fi
+done < "$tmp/json"
+[ "$n" -eq 0 ] && row PASS "jq . (no .json files in the kit)"
+
+[ $fail -eq 0 ] && echo "all checks passed" || echo "some checks FAILED"
+exit $fail
