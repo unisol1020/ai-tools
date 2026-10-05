@@ -2,7 +2,7 @@
 
 My kit of **Claude Code** tools — agents, skills, and config that install into `~/.claude` and work in any local project. Each one is a top-level folder with its own README and a one-line installer. Take the whole set, or just the one you want, by sending a README to Claude Code and saying *"install this"*.
 
-The set has a shape: **bootstrap** gets a machine and a repo ready; **worktree-graphs** keeps that setup working once you branch out into worktrees; **qa**, **tickets**, and **morning** are the everyday helpers; **team** is the crew of planner/engineer/reviewer/tester subagents the rest lean on; **memory** gives that crew and every skill a persistent, self-evolving memory so they get better each run.
+The set has a shape: **bootstrap** gets a machine and a repo ready; **worktree-graphs** keeps that setup working once you branch out into worktrees; **qa**, **tickets**, and **morning** are the everyday helpers; **team** is the crew of planner/engineer/reviewer/tester subagents the rest lean on; **memory** gives that crew and every skill a persistent, self-evolving memory so they get better each run; **handoff** carries a long task into a fresh session instead of letting it compact.
 
 ## How the tools fit together
 
@@ -17,6 +17,7 @@ flowchart TD
     QA["qa — does it work?<br/>does it match the design?<br/>web browser or iOS Simulator"]
     TIX["tickets — human-readable<br/>Linear / Jira tickets"]
     MORN["morning — PRs + tickets + Slack<br/>in one briefing"]
+    HAND["handoff — /handoff<br/>continue in a fresh session<br/>instead of compacting"]
   end
   TEAM["team — crew of subagents:<br/>plan · build · review · test"]
   MEM["memory — self-evolving agent memory<br/>project + global tiers"]
@@ -25,6 +26,7 @@ flowchart TD
   CC --> QA
   CC --> TIX
   CC --> MORN
+  CC --> HAND
   CC --> TEAM
   MORN -->|reuses reviewers| TEAM
   QA -->|manual-qa pairs with| TEAM
@@ -40,8 +42,9 @@ flowchart TD
 | [**qa**](qa/README.md) | A `manual-qa` agent that drives your running app to check a feature *works* (functional) or *matches the design* (Figma / pixel-perfect) — on the **web** (real browser, via Playwright) or on **native iOS** (booted Simulator, via Orca emulator when available, else Xcode MCP + `simctl`). Say *"test the native app"*, or let it infer the platform from the change. Remembers per-project URL + login + DB, asks once. | *"install this: https://github.com/unisol1020/ai-tools/blob/main/qa/README.md"* |
 | [**tickets**](tickets/README.md) | A `ticket` skill that writes **human-readable** Linear / Jira tickets (not AI slop) — repro + how-to-verify + where the problem lives — pulls Figma/Sentry/Slack context from connected MCPs, and posts test results as a comment. | *"install this: https://github.com/unisol1020/ai-tools/blob/main/tickets/README.md"* |
 | [**morning**](morning/README.md) | A `morning` skill — *"do my morning routine"* / `/morning` — that triages the three things you wake up to into one scannable briefing: open PRs in your repos that aren't yours (reviewed against each project's `CLAUDE.md` + the linked ticket + logic/quality), your assigned Linear/Jira tickets sorted urgency-then-effort and grouped by project, and Slack mentions / DMs / unread. Ships a standalone **`review-prs`** skill too — *"review all PRs"* / *"review this PR: \<url\>"*. PR comments are held for your OK before anything posts. | *"install this: https://github.com/unisol1020/ai-tools/blob/main/morning/README.md"* |
-| [**team**](team/README.md) | The **crew of subagents** Claude Code delegates to — `architect` (plans), `backend-engineer` / `frontend-engineer` (build), `automation-qa` (writes tests), and `backend-reviewer` / `frontend-reviewer` / `security-reviewer` (review). Claude picks the right one automatically; the architect's babysit protocol dispatches this crew. (`manual-qa` lives in `qa/`.) | *"install this: https://github.com/unisol1020/ai-tools/blob/main/team/README.md"* |
+| [**team**](team/README.md) | The **crew of subagents** Claude Code delegates to — `architect` (plans), `backend-investigator` / `frontend-investigator` (read-only scouts the architect sends ahead), `backend-engineer` / `frontend-engineer` (build), `automation-qa` (writes tests), and `backend-reviewer` / `frontend-reviewer` / `security-reviewer` (review). Claude picks the right one automatically; the architect's babysit protocol dispatches this crew. (`manual-qa` lives in `qa/`.) | *"install this: https://github.com/unisol1020/ai-tools/blob/main/team/README.md"* |
 | [**memory**](memory/README.md) | `agent-memory status` — every agent and skill in the kit **remembers what it learned and gets better each run**. Two tiers: **PROJECT** (what an agent learned about *this* repo — gitignored in the main checkout, shared by all its worktrees) and **GLOBAL** (`~/.claude/agent-memory/`, best practices a curator promotes once the same lesson recurs in two repos). Agents capture surprises, merge them at the end of each run and report a `memory: recalled/used/saved/repeats` line; a background `memory-curator` subagent consolidates, decays and promotes (`/evolve` runs it now). Built on Claude Code's native subagent memory. | *"install this: https://github.com/unisol1020/ai-tools/blob/main/memory/README.md"* |
+| [**handoff**](handoff/README.md) | `/handoff` — **continue in a fresh session instead of compacting**. The model writes a ≤ 60-line continuation document while it still has the context (goal, done + paths, in progress, decisions tagged *user said* / *my inference*, tried and failed, runnable next steps, verify commands), kept out of git under `.claude/handoffs/`; `/handoff resume` picks it up on the same branch and shows HEAD drift first, `/handoff done` closes it. A hook nudges you and the model at 50% context; a SessionStart hook points a fresh session at the open handoff. | *"install this: https://github.com/unisol1020/ai-tools/blob/main/handoff/README.md"* |
 | [**worktree-graphs**](worktree-graphs/README.md) | `graphs status` — every git worktree gets a working **CodeGraph index + Graphify graph**, instead of silently falling back to grep. Worktrees are fresh checkouts, so both gitignored graphs are missing; this reflink-clones main's index (3 copies of a 251 MB db = 8 KB) and syncs the branch delta on the session that opens there. Also fixes graphify going stale after `git pull`. | *"install this: https://github.com/unisol1020/ai-tools/blob/main/worktree-graphs/README.md"* |
 
 Each tool's README has its own self-install block, so you can install them one at a time.
@@ -59,17 +62,26 @@ You don't run anything. Paste this file (or its URL) into **Claude Code** and sa
 >      || git -C ~/.ai-tools pull --ff-only
 >    ```
 >    If an older `~/.ai-tools` clone exists, move it: `mv ~/.ai-tools ~/.ai-tools` and update the remote to `https://github.com/unisol1020/ai-tools.git`.
-> 3. **Run every tool's installer:**
+> 3. **Install the bootstrap skill and the shared toolchain first** — `memory` and `worktree-graphs` hard-fail without `jq`, and the MemPalace session hook needs the bootstrap skill already linked, so this step comes before the others:
+>    ```bash
+>    bash ~/.ai-tools/bootstrap/install.sh --with-deps
+>    ```
+> 4. **Run every other tool's installer:**
 >    ```bash
 >    for f in ~/.ai-tools/*/install.sh; do echo "== $f =="; bash "$f"; done
 >    ```
 >    Each installer symlinks its agent/skill into `~/.claude/` (so a later `git pull` updates everything) and registers or checks for the MCP it needs. They're idempotent — safe to re-run.
-> 4. **Verify:** `ls -la ~/.claude/agents ~/.claude/skills` shows symlinks pointing into `~/.ai-tools/*`.
-> 5. **Report back to the user** — confirm what installed (bootstrap, qa, tickets, morning, team), call out any `✗` dependency lines an installer printed (with the `brew`/`npm` fix), tell them to **restart Claude Code once** so agents / skills / MCP tools load, then summarize each tool in a line or two (paraphrase the per-tool READMEs; keep it short).
+> 5. **Re-run the toolchain setup if step 3 reported anything missing:**
+>    ```bash
+>    bash ~/.ai-tools/bootstrap/skills/bootstrap/setup-env.sh
+>    ```
+>    This is what makes every agent cheaper to run. The agents here are written to search, query a code graph and recall memory *before* they read a file, because reading files is where token cost comes from. Every tool this installs is one an agent would otherwise work around the expensive way: **`jq`** (settings edits), **`ripgrep`** (the `Grep` tool *is* ripgrep — one search costs a fraction of one Read), **`ast-grep`** (structural search: one pattern instead of a dozen greps), **CodeGraph + its MCP** (symbols, callers and call paths in one call), **graphify + its skill** (relations that cross files and apps), **MemPalace + its MCP and capture hooks** (cross-session memory, so nothing is re-derived next session), and the **ponytail** plugin. It installs only what's absent, backs up `~/.claude/settings.json` before touching it, and ends with a per-tool status list. Install everything it reports as missing, then re-run it.
+> 6. **Verify:** `ls -la ~/.claude/agents ~/.claude/skills` shows symlinks pointing into `~/.ai-tools/*`.
+> 7. **Report back to the user** — confirm what installed (bootstrap, qa, tickets, morning, team), call out any `✗` lines the installers or the toolchain setup printed (with the `brew`/`npm` fix), tell them to **restart Claude Code once** so agents / skills / MCP tools load, then summarize each tool in a line or two (paraphrase the per-tool READMEs; keep it short).
 >
 > Update later with `git -C ~/.ai-tools pull` (symlinks pick it up). Uninstall: see each tool's README, or the bottom of this file.
 
-Requirements: [Claude Code](https://claude.com/claude-code) and `git` for everything. Node.js (`npx`) for the Playwright MCP that `qa` uses. Per-tool requirements are in each tool's README.
+Requirements: [Claude Code](https://claude.com/claude-code) and `git` for everything. Node.js (`npx`) for the Playwright MCP that `qa` uses, and for the CodeGraph CLI. `uv` or `pipx` (Python 3.10+) for graphify and MemPalace — step 4 installs `uv` via Homebrew if neither is present. Nothing in step 4 is strictly required: the agents degrade to reading files, which works and costs more. Per-tool requirements are in each tool's README.
 
 ### Manual install (if you'd rather)
 
