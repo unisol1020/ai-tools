@@ -30,25 +30,32 @@ case ":$PATH:" in
 esac
 
 echo "Wiring the SessionStart hook ..."
+command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required (brew install jq / apt install jq)"; exit 1; }
+[ -f "$SETTINGS" ] || echo '{}' > "$SETTINGS"
+cp -p "$SETTINGS" "$SETTINGS.bak-$(date +%Y%m%d-%H%M%S)"
 HOOK='d="${CLAUDE_PROJECT_DIR:-$PWD}"; g="$HOME/.claude/bin/graphs"; [ -x "$g" ] && (cd "$d" && nohup "$g" ensure >/dev/null 2>&1 &); true'
-python3 - "$SETTINGS" "$HOOK" <<'PY'
-import json, os, sys
-path, hook = sys.argv[1], sys.argv[2]
-d = json.load(open(path)) if os.path.exists(path) else {}
-hooks = d.setdefault("hooks", {}).setdefault("SessionStart", [])
-flat = [h for e in hooks for h in e.get("hooks", [])]
-if any("graphs" in h.get("command", "") and "ensure" in h.get("command", "") for h in flat):
-    print("  hook already present — skipping")
-else:
-    replaced = False
-    for h in flat:
-        if "codegraph sync" in h.get("command", ""):
-            h["command"] = hook; replaced = True
-    if not replaced:
-        hooks.append({"hooks": [{"type": "command", "command": hook}]})
-    json.dump(d, open(path, "w"), indent=2); open(path, "a").write("\n")
-    print("  replaced the old codegraph-sync hook" if replaced else "  added SessionStart hook")
-PY
+# startup|resume only: /clear and compact reopen the same checkout, so re-running ensure buys nothing.
+MATCHER='startup|resume'
+DEFS='
+  def ours: (.command // "") | (contains("graphs") and contains("ensure"));
+  def old:  (.command // "") | (contains("codegraph") and contains("sync"));
+  def entries: [.hooks.SessionStart[]?];'
+action=$(jq -r --arg m "$MATCHER" "$DEFS"'
+  if any(entries[].hooks[]?; ours) then
+    (if any(entries[]; any(.hooks[]?; ours) and .matcher == null) then "matcher" else "present" end)
+  elif any(entries[].hooks[]?; old) then "replaced" else "added" end' "$SETTINGS")
+jq --arg hook "$HOOK" --arg m "$MATCHER" --arg action "$action" "$DEFS"'
+  .hooks = (.hooks // {}) | .hooks.SessionStart = (.hooks.SessionStart // []) |
+  if $action == "matcher"  then .hooks.SessionStart |= map(if any(.hooks[]?; ours) and .matcher == null then .matcher = $m else . end)
+  elif $action == "replaced" then .hooks.SessionStart |= map(if any(.hooks[]?; old) then .matcher = $m | .hooks |= map(if old then .command = $hook else . end) else . end)
+  elif $action == "added"    then .hooks.SessionStart += [{matcher: $m, hooks: [{type: "command", command: $hook}]}]
+  else . end' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+case "$action" in
+  present)  echo "  hook already present — skipping";;
+  matcher)  echo "  hook already present — set matcher to $MATCHER";;
+  replaced) echo "  replaced the old codegraph-sync hook";;
+  added)    echo "  added SessionStart hook (matcher: $MATCHER)";;
+esac
 
 echo
 if ! command -v codegraph >/dev/null 2>&1; then
