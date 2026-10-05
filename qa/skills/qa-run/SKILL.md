@@ -78,13 +78,13 @@ If the command is missing, skip this section.
      - **Decline (don't ask again)** → `status:declined`.
    - **The DB URL must be a local or dev database.** Say this explicitly when asking. If the user hands over a **production** URL, warn once that QA will read prod and that they're accepting the risk; proceed only on explicit confirmation, record `env:"prod"`, and never run anything but read-only queries.
 
-8. **Invoke `manual-qa`** (Agent tool), once per in-scope app, with a self-contained prompt: the **platform** (web or native, and why you picked it), for native whether **Orca emulator** or **Xcode MCP** should drive the Simulator (probe Orca first), the **mode** (functional vs design — infer from the ask), the app's **url** (web) or the Xcode project/workspace + scheme and booted simulator UDID/name if you know them (native), its **credentials** if `status:set` (tell it to log in via the UI first), and — for design — the Figma link found in the conversation or a request to the user for a Figma link / screenshot. State whether DB verification is available.
+8. **Invoke `manual-qa`** (Agent tool), once per in-scope app, with a self-contained prompt: the **platform** (web or native, and why you picked it), for native, which rung of the driver ladder to start on — **Orca emulator** → **Xcode DeviceInteraction MCP** → **`orca computer`** → simctl/System Events (probe Orca first; manual-qa walks down on its own if a rung fails), the **mode** (functional vs design — infer from the ask), the app's **url** (web) or the Xcode project/workspace + scheme and booted simulator UDID/name if you know them (native), its **credentials** if `status:set` (tell it to log in via the UI first), and — for design — the Figma link found in the conversation or a request to the user for a Figma link / screenshot. State whether DB verification is available.
 
 9. **Handle a login block.** If manual-qa returns `BLOCKED_AT_LOGIN: <what>` (needed auth, none provided), **ping the user**: "manual-qa is blocked at login for **<app>** — provide credentials now? (saved to this project)". Yes → collect, store `status:set`, re-invoke. No → report what was/wasn't verifiable.
 
 10. **DB cross-check** (only if `db.status:"set"`): after manual-qa confirms a UI write, run the configured read-only SQL — via the DB MCP (`access:"mcp"`) or `psql "<url>" -c "…"` (`access:"psql"`) — to confirm the row changed; fold into the report. Read-only — never mutate. If `env:"prod"`, double down: SELECT only.
 
-11. **Report.** Relay manual-qa's verdict (PASS/FAIL/PARTIAL) + findings/differences + anything unverified, plus the DB confirmation if run. For multiple in-scope apps, one section per app.
+11. **Report.** Relay manual-qa's verdict (PASS/FAIL/PARTIAL) + findings/differences + anything unverified, plus the DB confirmation if run, and relay manual-qa's `memory:` stats line verbatim — it is the run's memory evidence, separate from this skill's own line. For multiple in-scope apps, one section per app.
 
 ## Rules
 
