@@ -49,7 +49,7 @@ Restart Claude Code once.
 
 ### Statusline (optional)
 
-The installer prints `statusline/snippet.sh` and never edits your statusline. Paste it into `~/.claude/statusline.sh` right after the block that finalises `pct`: it writes `<epoch> <pct>` to `$TMPDIR/ai-tools-ctx-<session_id>` so the nudge uses Claude Code's own number, and shows how to append `→ /handoff` to the percentage at 50%.
+The installer prints `statusline/snippet.sh` and never edits your statusline. Paste it into `~/.claude/statusline.sh` right after the block that finalises `pct`: it writes `<epoch> <pct> <window>` to `$TMPDIR/ai-tools-ctx-<session_id>` so the nudge uses Claude Code's own number (the percentage while it is under 2 minutes old, the window size at any age), and shows how to append `→ /handoff` to the percentage at 50%. The kit's own `statusline/statusline.py` already writes this file, so skip the snippet if you use it.
 
 ## Layout on disk
 

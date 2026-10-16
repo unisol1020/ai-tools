@@ -1,7 +1,7 @@
 #!/bin/sh
 # Advisory context-usage nudge for UserPromptSubmit and PostToolUse.
 # The cheap guards run here so a quiet call never starts python; any failure exits 0 silently.
-# AI_TOOLS_CONTEXT_WINDOW overrides the window (200k, or 1M when the model setting ends in [1m]); AI_TOOLS_HANDOFF_PCT the threshold (50).
+# AI_TOOLS_CONTEXT_WINDOW overrides the window (the statusline's size, else 200k, or 1M when the model setting ends in [1m]); AI_TOOLS_HANDOFF_PCT the threshold (50).
 set -u
 
 input=$(cat 2>/dev/null) || exit 0
@@ -48,10 +48,12 @@ CTX = ("Context is ≈{p}% used. Suggest the user run /handoff now and continue 
 USED_KEYS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
 
 
-def window(cwd):
+def window(cwd, reported):
     env = os.environ.get("AI_TOOLS_CONTEXT_WINDOW", "")
     if env.isdigit() and int(env) > 0:
         return int(env)
+    if reported:
+        return reported
     for path in (os.path.join(cwd, ".claude", "settings.local.json"),
                  os.path.join(cwd, ".claude", "settings.json"),
                  os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"), "settings.json")):
@@ -65,16 +67,23 @@ def window(cwd):
     return 200_000
 
 
-def statusline_pct(tmp, sid):
+def field_int(fields, i):
+    try:
+        return int(float(fields[i]))
+    except (IndexError, ValueError, OverflowError):
+        return None
+
+
+# The window size never goes stale the way the percentage does, so it is used at any age.
+def statusline_feed(tmp, sid):
     try:
         with open(f"{tmp}/ai-tools-ctx-{sid}") as f:
-            epoch, pct = f.read().split()[:2]
-        age = time.time() - int(epoch)
-        if 0 <= age <= 120 and 0 <= int(pct) <= 100:
-            return int(pct)
-    except (OSError, ValueError):
-        pass
-    return None
+            fields = f.read().split()
+    except OSError:
+        return None, None
+    epoch, pct, size = (field_int(fields, i) for i in range(3))
+    fresh = None not in (epoch, pct) and 0 <= time.time() - epoch <= 120 and 0 <= pct <= 100
+    return (pct if fresh else None), (size if size and size > 0 else None)
 
 
 def transcript_used(path):
@@ -83,17 +92,21 @@ def transcript_used(path):
         f.seek(max(0, f.tell() - 4 * 1024 * 1024))
         lines = f.read().split(b"\n")
     for line in reversed(lines):
-        if b'"usage"' not in line:
+        if b'"usage"' not in line and b'"compact_boundary"' not in line:
             continue
         try:
             rec = json.loads(line)
         except ValueError:
             continue
+        if rec.get("type") == "system" and rec.get("subtype") == "compact_boundary":
+            return None
         if rec.get("type") != "assistant" or rec.get("isSidechain"):
             continue
         usage = (rec.get("message") or {}).get("usage")
-        if isinstance(usage, dict):
-            return sum(int(usage.get(k) or 0) for k in USED_KEYS)
+        used = sum(int(usage.get(k) or 0) for k in USED_KEYS) if isinstance(usage, dict) else 0
+        # Synthetic records (usage limit, API error) carry all-zero usage; Claude Code skips them too.
+        if used:
+            return used
     return None
 
 
@@ -108,12 +121,13 @@ def main():
     if os.path.exists(guard):
         return
     threshold = int(os.environ.get("AI_TOOLS_HANDOFF_PCT") or 50)
-    pct = statusline_pct(tmp, sid)
-    if pct is None:
+    pct, size = statusline_feed(tmp, sid)
+    # An explicit window override asks for the estimate against that window, not Claude Code's percentage.
+    if pct is None or os.environ.get("AI_TOOLS_CONTEXT_WINDOW"):
         used = transcript_used(d["transcript_path"])
         if used is None:
             return
-        pct = min(100, used * 100 // window(d.get("cwd") or os.getcwd()))
+        pct = min(100, used * 100 // window(d.get("cwd") or os.getcwd(), size))
     if pct < threshold:
         return
     open(guard, "w").close()

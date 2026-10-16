@@ -87,6 +87,43 @@ printf '%s 72\n' "$(( $(date +%s) - 300 ))" > "$TMPDIR/ai-tools-ctx-st2"
 expect_empty "nudge: statusline file older than 120 s is ignored" "$(nudge st2 "$fx/transcript-30pct.jsonl" "$work/proj" UserPromptSubmit)"
 printf '%s 72\n' "$(date +%s)" > "$TMPDIR/ai-tools-ctx-other"
 expect_empty "nudge: statusline file for another session is ignored" "$(nudge st3 "$fx/transcript-30pct.jsonl" "$work/proj" UserPromptSubmit)"
+printf '%s 72 1000000\n' "$(( $(date +%s) - 300 ))" > "$TMPDIR/ai-tools-ctx-st4"
+expect_empty "nudge: a stale statusline file still lends its 1M window (120k of 1M is silent)" "$(nudge st4 "$big" "$work/proj" UserPromptSubmit)"
+printf '%s 72 1000000\n' "$(( $(date +%s) - 300 ))" > "$TMPDIR/ai-tools-ctx-st5"
+expect_json "nudge: AI_TOOLS_CONTEXT_WINDOW beats the statusline's window" "$(hook_in st5 "$big" "$work/proj" UserPromptSubmit | AI_TOOLS_CONTEXT_WINDOW=200000 sh "$nudge")"
+printf '%s -1 1000000\n' "$(date +%s)" > "$TMPDIR/ai-tools-ctx-st6"
+expect_empty "nudge: a feed with no reading yet (-1) still lends its window" "$(nudge st6 "$big" "$work/proj" UserPromptSubmit)"
+printf '%s 11.5 1000000\n' "$(date +%s)" > "$TMPDIR/ai-tools-ctx-st7"
+expect_empty "nudge: a fractional feed percentage still parses" "$(nudge st7 "$big" "$work/proj" UserPromptSubmit)"
+printf '%s 11 1000000\n' "$(date +%s)" > "$TMPDIR/ai-tools-ctx-st8"
+expect_json "nudge: AI_TOOLS_CONTEXT_WINDOW beats a fresh feed percentage" "$(hook_in st8 "$big" "$work/proj" UserPromptSubmit | AI_TOOLS_CONTEXT_WINDOW=200000 sh "$nudge")"
+{
+  cat "$fx/transcript-60pct.jsonl"
+  printf '{"parentUuid":"a1","isSidechain":false,"type":"assistant","message":{"model":"<synthetic>","role":"assistant","content":[{"type":"text","text":"Usage limit reached"}],"usage":{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"uuid":"a9"}\n'
+} > "$work/synthetic.jsonl"
+expect_json "nudge: a synthetic zero-usage record does not hide the real 60%" "$(nudge syn1 "$work/synthetic.jsonl" "$work/proj" UserPromptSubmit)"
+
+compacted="$work/compacted.jsonl"
+{
+  cat "$fx/transcript-60pct.jsonl"
+  printf '{"parentUuid":null,"isSidechain":false,"type":"system","subtype":"compact_boundary","content":"Conversation compacted","compactMetadata":{"trigger":"auto","preTokens":120000},"uuid":"c1"}\n'
+  printf '{"parentUuid":"c1","isSidechain":false,"type":"user","isCompactSummary":true,"message":{"role":"user","content":"This session is being continued from a previous conversation."},"uuid":"c2"}\n'
+} > "$compacted"
+expect_empty "nudge: usage recorded before a compaction is ignored" "$(nudge cmp1 "$compacted" "$work/proj" UserPromptSubmit)"
+{ cat "$compacted"; tail -n 1 "$fx/transcript-60pct.jsonl"; } > "$work/compacted-then-60.jsonl"
+expect_json "nudge: usage recorded after a compaction counts" "$(nudge cmp2 "$work/compacted-then-60.jsonl" "$work/proj" UserPromptSubmit)"
+
+statusline="$root/../statusline/statusline.py"
+if [ -f "$statusline" ]; then
+  printf '{"session_id":"sl1","context_window":{"used_percentage":12.6,"context_window_size":1000000}}' | python3 "$statusline" >/dev/null 2>&1
+  read -r _ sl_pct sl_size < "$TMPDIR/ai-tools-ctx-sl1" 2>/dev/null
+  [ "${sl_pct:-}" = 13 ] && [ "${sl_size:-}" = 1000000 ] && pass "statusline.py feeds the nudge its percentage and window" || flunk "statusline.py feed" "$(cat "$TMPDIR/ai-tools-ctx-sl1" 2>&1)"
+  sl_pct= sl_size=
+  printf '{"session_id":"sl2","context_window":{"used_percentage":null,"context_window_size":1000000}}' | python3 "$statusline" >/dev/null 2>&1
+  read -r _ sl_pct sl_size < "$TMPDIR/ai-tools-ctx-sl2" 2>/dev/null
+  [ "${sl_pct:-}" = -1 ] && [ "${sl_size:-}" = 1000000 ] && pass "statusline.py writes -1 and the window when there is no reading yet" || flunk "statusline.py null feed" "$(cat "$TMPDIR/ai-tools-ctx-sl2" 2>&1)"
+  ls "$TMPDIR"/ai-tools-ctx-sl*.* >/dev/null 2>&1 && flunk "statusline.py left a partial feed file behind" || pass "statusline.py replaces the feed atomically"
+fi
 
 mkdir -p "$work/p1m/.claude" "$work/p2/.claude" "$work/p3/.claude" "$HOME/.claude"
 printf '{"model":"claude-x[1m]"}\n' > "$work/p1m/.claude/settings.json"

@@ -362,6 +362,25 @@ def write(text):
             pass
 
 
+# Feeds handoff's context nudge Claude Code's own numbers instead of its transcript estimate.
+def feed_handoff(d):
+    sid = str(d.get("session_id") or "")
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", sid):
+        return
+    pct = fnum(dig(d, "context_window.used_percentage"))
+    # No reading yet (e.g. right after a compaction) is written as -1 so a stale pre-compact percentage is never trusted.
+    pct = -1 if pct is None else max(0, min(100, round(pct)))
+    size = int(fnum(dig(d, "context_window.context_window_size"), 0) or 0)
+    path = "%s/ai-tools-ctx-%s" % ((os.environ.get("TMPDIR") or "/tmp").rstrip("/") or "/tmp", sid)
+    part = "%s.%d" % (path, os.getpid())
+    try:
+        with open(part, "w") as f:
+            f.write("%d %d %d\n" % (time.time(), pct, size))
+        os.replace(part, path)
+    except OSError:
+        pass
+
+
 def main():
     try:
         raw = sys.stdin.read()
@@ -370,6 +389,7 @@ def main():
         d = {}
     if not isinstance(d, dict):
         d = {}
+    feed_handoff(d)
     cwd = dig(d, "workspace.current_dir") or d.get("cwd") or os.getcwd()
     width = max(40, min(400, term_width())) - 2
     top = fit(place_line(d, cwd), width)
