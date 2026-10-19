@@ -72,7 +72,7 @@ You don't run anything. Paste this file (or its URL) into **Claude Code** and sa
 > 5. **Verify:** `ls -la ~/.claude/agents/` shows `architect`, `backend-investigator`, `frontend-investigator`, `backend-engineer`, `frontend-engineer`, `automation-qa`, `backend-reviewer`, `frontend-reviewer`, `security-reviewer` as symlinks into `~/.ai-tools/team`.
 > 6. **Report back to the user** — confirm it's installed, tell them to **restart Claude Code once** so the agents load, then note two things:
 >    - The crew works on its own, but pairs with the rest of ai-tools: install `qa/` (adds `manual-qa` + the browser tools) to complete the plan→build→test→review chain.
->    - **For the architect's "grill" step:** if a **`grill-with-ui`** (or terminal **`grill-me`**) skill is in the session's skill list, the architect's Phase 1 is REQUIRED to route through it — the architect hands back a Way-Finding Brief (findings + the target solution + open decisions) and the parent grills the user with it, returning the **agreed end solution**. Only when neither exists does the architect fall back to a question list. Install them (see [The grill skill](#the-grill-skill-for-the-architect) below), then restart.
+>    - **For the architect's "grill" step:** if a **`grill-with-ui`** (or terminal **`grill-me`**) skill is in the session's skill list, the architect's Phase 1 is REQUIRED to route through it — the architect hands back a Way-Finding Brief (findings + the target solution + open decisions) and the parent grills the user with it, returning the **agreed end solution**. Outside T3 Code, only when neither exists does the architect fall back to a question list. In **T3 Code** neither is used unless you name one: the grill runs in T3's own question cards. Install them (see [The grill skill](#the-grill-skill-for-the-architect) below), then restart.
 
 ### Manual install (if you'd rather)
 
@@ -84,7 +84,7 @@ Then restart Claude Code.
 
 ## The grill skill (for the architect)
 
-The architect's Phase 1 is a **grill step**, and grilling is **way-finding, not a questionnaire**: it ends with an *agreed end solution*, not a pile of answers. So the architect never hands over a flat question list. The moment decisions remain open it stops and returns a **Way-Finding Brief** — (1) findings from Phase 0 with their sources, (2) the **target solution** it is converging on plus the candidate shapes, and (3) numbered open decisions, upstream-first, each with its recommended answer and what changes if you pick otherwise. The parent then grills you *toward that target solution* and sends back the agreed end solution (plus the per-decision answers, flagging anything that overturned the architect's recommendation). Phase 2 designs that agreed solution — if it contradicts the architect's target, yours wins. Only when the skill is absent does the architect fall back to a question list the parent polls, and even then the target solution goes to you as one of the choices.
+The architect's Phase 1 is a **grill step**, and grilling is **way-finding, not a questionnaire**: it ends with an *agreed end solution*, not a pile of answers. So the architect never hands over a flat question list. The moment decisions remain open it stops and returns a **Way-Finding Brief** — (1) findings from Phase 0 with their sources, (2) the **target solution** it is converging on plus the candidate shapes, and (3) numbered open decisions, upstream-first, each with its recommended answer and what changes if you pick otherwise. The parent then grills you *toward that target solution* and sends back the agreed end solution (plus the per-decision answers, flagging anything that overturned the architect's recommendation). Phase 2 designs that agreed solution — if it contradicts the architect's target, yours wins. Outside T3 Code, only when the skill is absent does the architect fall back to a question list the parent polls, and even then the target solution goes to you as one of the choices.
 
 **Recommended: [`grill-with-ui`](https://github.com/jasonku09/grill-with-ui) by [Jason Ku](https://github.com/jasonku09).** It moves the grill onto a local browser page: each question is a card with lettered options and the recommendation outlined, you answer in any order, discuss any one in its own thread, defer or reopen, and ship a whole round with one **Send to Agent**. **Visualize** draws the design so far, and **Finish** writes `docs/<topic>-design.md`. One Node script, one HTML page, no npm dependencies, served on `127.0.0.1` only; session state lives in `~/.grill-with-ui/`, outside the repo. MIT. 🙏
 
@@ -102,6 +102,8 @@ claude plugin install mattpocock-skills@mattpocock
 
 Neither is vendored into this repo. Restart Claude Code after installing and the architect routes its Phase-1 questioning through them.
 
+**In [T3 Code](https://github.com/pingdotgg/t3code), neither skill is used.** T3 renders Claude's `AskUserQuestion` as native question cards in the thread, so the grill runs there: rounds of up to four questions, the recommendation first as `(Recommended)`, each round built from the last one's answers, closing on one question that states the agreed end solution (`Agreed` settles the solution only; the build go/no-go stays separate). T3 keeps the header, question, option labels and descriptions and `multiSelect`, and drops `preview`. The parent knows it is in T3 from its system prompt, which says so. Name `/grill-with-ui` or `/grill-me` to use one anyway. The full rule is the `### In T3 Code` part of the global `CLAUDE.md` block below.
+
 ### Let the architect call it automatically (recommended tweak)
 
 Matt ships `grill-me` as **user-only** — its frontmatter has `disable-model-invocation: true`, so out of the box it only fires when **you** type `/grill-me`. For the architect → parent hand-back to trigger it *on its own* (no typing), make it model-invocable: open `~/.claude/skills/grill-me/SKILL.md` and **delete the `disable-model-invocation: true` line**. One line:
@@ -116,7 +118,7 @@ Matt ships `grill-me` as **user-only** — its frontmatter has `disable-model-in
   Run a `/grilling` session.
 ```
 
-(Optional: widen the `description` to name the triggers — e.g. *"…Use when the user wants to stress-test a plan, uses any 'grill' phrase, or when a subagent like the architect hands back open questions."* The model reads the description to decide when to auto-invoke, so a fuller one makes it fire more reliably.) The `grilling` engine it calls is already model-invocable, so this only affects the `grill-me` alias. Restart Claude Code — now both the model and `/grill-me` can run it.
+(Optional: widen the `description` to name the triggers — e.g. *"…Use when the user wants to stress-test a plan, uses any 'grill' phrase, or when a subagent like the architect hands back open questions (outside T3 Code)."* The model reads the description to decide when to auto-invoke, so a fuller one makes it fire more reliably.) The `grilling` engine it calls is already model-invocable, so this only affects the `grill-me` alias. Restart Claude Code — now both the model and `/grill-me` can run it.
 
 ### Force the main thread to grill, not poll
 
@@ -125,16 +127,22 @@ The architect halts and demands a grill the moment it has open questions — but
 ```markdown
 ## Grill, don't poll (requirements for any plan / feature / non-trivial change)
 
-Whenever you gather requirements before planning or building something non-trivial — in the
-main thread OR when the architect hands back a Way-Finding Brief — you MUST interrogate the user
-via the `grill-with-ui` skill (the terminal `grill-me` skill when no browser is reachable), NOT
-AskUserQuestion polls and NOT your own question list. Grilling is way-finding: adaptive questions,
-each with a recommendation, steered toward a solution, ending in a shared understanding. A poll is not grilling. If the architect
-returns a brief with a target solution and open decisions, grill toward that solution and
-SendMessage back the AGREED END SOLUTION (plus the per-decision answers and the design doc path) before it designs — never
-a bare list of answers. Fall back to AskUserQuestion ONLY after you look and confirm neither
-grill-with-ui nor grill-me is installed. AskUserQuestion is still fine for a quick one-off choice
-mid-task that isn't requirements-gathering.
+Whenever you gather requirements before planning or building something non-trivial — in the main thread OR when the architect agent hands back open questions — you MUST interrogate the user by invoking the **`grill-with-ui`** skill (questions as cards on a local browser page, each with a recommendation, answered and discussed in any order, sent back in rounds), NOT a batch of `AskUserQuestion` polls and NOT your own free-text question list. Use the terminal **`grill-me`** skill (engine: `grilling`) instead only when no browser is reachable (remote/headless session) or I ask for it. A poll is not grilling. **In T3 Code the grill runs in T3's own question UI instead — see below.**
+
+- If the **architect** returns a Way-Finding Brief / a "REQUIRED before I can design" instruction, invoke `grill-with-ui` (in T3 Code: the T3 rounds below), seeding it with the brief's target solution and open decisions, each carrying its recommendation, and grill **toward the brief's target solution** — then `SendMessage` the architect the **agreed end solution** (what we are actually building, in my words) plus the per-decision answers, flagging any that overturned its recommendation, and the path of the design doc grill-with-ui wrote (none in T3 Code). Never send back a bare list of answers, and never shortcut this with a poll.
+- Before you do your own scoping questions for a plan, run `grill-with-ui` (in T3 Code: the T3 rounds) instead.
+- **Outside T3 Code, fallback to an `AskUserQuestion` poll ONLY after you have looked and confirmed neither `grill-with-ui` nor `grill-me`/`grilling` is installed** in this session. Not installed is the only reason to skip it.
+- `AskUserQuestion` is still fine for a quick one-off choice mid-task that isn't requirements-gathering.
+
+### In T3 Code: grill in T3's question UI
+
+When the system prompt says you are running in T3 Code, do not open `grill-with-ui` or `grill-me` unless I type `/grill-with-ui` or `/grill-me` or name the skill; a plain "grill me" means the T3 rounds. T3 renders `AskUserQuestion` as its native question cards, so the grill runs there, in rounds. Multi-round `AskUserQuestion` is the grill here, not a poll:
+
+- One round is one `AskUserQuestion` call: at most 4 questions, in the brief's upstream-first order. A question whose options depend on another unanswered question waits for the next round, even when the round has room. Build each round from the last one's answers and follow wherever they lead, including branches nobody listed.
+- Each question puts its recommendation first as `<label> (Recommended)`; every option's `description` says what picking it changes. When I answer in my own words, T3 returns only my text: treat it as discussion and pick it up in the next round.
+- T3 keeps only `header`, `question`, option `label`/`description` and `multiSelect`. It drops `preview`, so put any comparison in the descriptions. Answers are keyed by question text, so no two questions in a round may share it.
+- Close once every open decision is answered and the last round opened no new branch: one question whose text is a short paragraph stating the agreed end solution (goal, shape, key flows, what done means), with `Agreed (Recommended)` against `Change something`. On a bare `Change something`, ask which decisions to reopen (`multiSelect`, one option per decision), grill those, then close again.
+- `Agreed` settles the solution only; it is never approval to build. Send the architect that paragraph verbatim as the agreed end solution, plus anything I typed, and put further detail under the per-decision answers.
 ```
 
 ## Requirements

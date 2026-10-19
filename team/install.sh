@@ -122,7 +122,10 @@ Terminal fallback for sessions with no browser — **grill-me** by Matt Pocock (
   claude plugin marketplace add mattpocock/skills
   claude plugin install mattpocock-skills@mattpocock
 Neither is bundled here. If either is present the architect routes its Phase-1 questioning
-through it; if neither is, it builds the question list itself. Restart after installing.
+through it; if neither is, it builds the question list itself. In T3 Code neither is used
+unless you name one: the grill runs in T3's own question cards (AskUserQuestion); paste the
+"Grill, don't poll" block from team/README.md into ~/.claude/CLAUDE.md for the full rule.
+Restart after installing.
 
 Pairs with the rest of ai-tools: the architect's babysit protocol
 dispatches exactly these agents (plan → implement → test → review), and qa/ adds manual-qa.
