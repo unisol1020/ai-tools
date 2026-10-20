@@ -112,7 +112,8 @@ if have jq; then
 else note "✗ jq needed to enable the ponytail plugin — brew install jq"; fi
 
 # 5. MemPalace: cross-session memory — local embeddings, no API key ------------
-if have mempalace; then note "✓ mempalace already installed"
+if have mempalace; then
+  note "✓ mempalace $(mempalace --version 2>/dev/null | awk '{print $NF}')"
 else
   if have uv; then uv tool install mempalace >/dev/null 2>&1
   elif have pipx; then pipx install mempalace >/dev/null 2>&1
@@ -131,38 +132,10 @@ if have mempalace && have claude; then
   fi
 fi
 
-# MemPalace automatic capture: load on session start, save on stop/end/precompact.
-# Without these the MCP only exposes tools the model may call — nothing is saved
-# automatically, which is NOT how claude-mem behaved.
+# MemPalace automatic capture + recall. Without these the MCP only exposes tools the
+# model may call, and nothing is saved or recalled automatically.
 if have mempalace && have python3; then
-  mkdir -p "$CLAUDE_DIR"; sj="$CLAUDE_DIR/settings.json"; [ -f "$sj" ] || echo '{}' > "$sj"
-  cp -p "$sj" "$sj.bak-$(ts)"
-  CLAUDE_SETTINGS="$sj" python3 - <<'PYHOOK'
-import json, os, collections
-p = os.environ['CLAUDE_SETTINGS']
-d = json.load(open(p), object_pairs_hook=collections.OrderedDict)
-hooks = d.setdefault('hooks', collections.OrderedDict())
-added = []
-for event, name in (('SessionStart','session-start'), ('Stop','stop'),
-                    ('SessionEnd','session-end'), ('PreCompact','precompact')):
-    groups = hooks.setdefault(event, [])
-    if any('mempalace' in str(h.get('command','')) for g in groups for h in g.get('hooks', [])):
-        continue
-    if event == 'SessionStart':
-        # MemPalace's own session-start hook injects NOTHING (it only tracks
-        # state). This wrapper runs it, then injects `mempalace wake-up` so
-        # memory actually reaches the session the way claude-mem did.
-        cmd = 'bash "$HOME/.claude/skills/bootstrap/mempalace-session-start.sh"'
-    else:
-        cmd = ('[ -x "$HOME/.local/bin/mempalace" ] && "$HOME/.local/bin/mempalace" '
-               f'hook run --hook {name} --harness claude-code || printf \'{{}}\\n\'')
-    groups.append(collections.OrderedDict([("hooks", [
-        collections.OrderedDict([("type", "command"), ("command", cmd)])])]))
-    added.append(event)
-json.dump(d, open(p, 'w'), indent=2)
-print("HOOKS:" + (",".join(added) if added else "already-present"))
-PYHOOK
-  note "✓ mempalace capture hooks wired (SessionStart/Stop/SessionEnd/PreCompact)"
+  bash "$(dirname "${BASH_SOURCE[0]}")/mempalace-wire-hooks.sh"
 fi
 
 # Recall rules: hooks make saving automatic, this makes the model actually look.

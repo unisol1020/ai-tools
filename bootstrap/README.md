@@ -113,45 +113,70 @@ rm ~/.claude/skills/bootstrap ~/.claude/hooks/bootstrap-check.sh
 # then remove the SessionStart entries for bootstrap-check.sh and the codegraph sync from ~/.claude/settings.json
 ```
 
+The MemPalace hooks (SessionStart, UserPromptSubmit, Stop, SessionEnd, PreCompact) also run scripts
+inside the skill dir. Once it is removed they fail on every turn, so delete them in the same step:
+
+```bash
+jq '.hooks |= with_entries(.value |= map(.hooks |= map(select(.command | contains("mempalace") | not)))
+                            | map(select(.hooks | length > 0)))' ~/.claude/settings.json > /tmp/s.json \
+  && mv /tmp/s.json ~/.claude/settings.json
+```
+
 ## Memory: MemPalace (and migrating off claude-mem)
 
-`setup-env.sh` installs [MemPalace](https://github.com/MemPalace/mempalace) (MIT), registers its MCP
-at user scope, and wires four capture hooks into `~/.claude/settings.json`:
+`setup-env.sh` installs [MemPalace](https://github.com/MemPalace/mempalace) (MIT, 3.11+), registers
+its MCP at user scope, and `mempalace-wire-hooks.sh` wires five hooks into `~/.claude/settings.json`.
+Every one goes through `mempalace-hook.sh`, which runs `mempalace_hooks.py` under MemPalace's own
+Python:
 
 | Hook | Effect |
 |---|---|
-| `SessionStart` | loads relevant memory into the session |
+| `SessionStart` | injects `wake-up` (~800 tokens) for the repo you are in |
+| `UserPromptSubmit` | searches the repo's wing with your prompt and injects up to 3 memories that clear a similarity bar |
 | `Stop` | saves after each turn |
 | `SessionEnd` | saves on close |
 | `PreCompact` | saves before context compaction |
 
-**Saving and recall are two separate mechanisms — you need both.**
+**One wing per repo, not per directory.** Saving and recall have to agree on the wing, or recall
+reads a wing nothing is saved into. MemPalace names a session's wing after the leaf of its cwd, so
+a T3 worktree (`~/.t3/worktrees/mono/t3-1a2b`) or an Orca workspace
+(`~/orca/workspaces/mono/bug-login`) became its own wing, and before 3.11 every transcript landed
+in one flat `sessions` wing. `mempalace_hooks.py` resolves the cwd to the repo's main checkout
+(`git rev-parse --git-common-dir`, falling back to the worktree's parent dir once it is deleted) and
+files and reads under that repo's name, so `mono` is one wing however many worktrees touched it.
+T3 scratch and temp dirs map to the machine's workstation wing.
 
-*Saving* is the `Stop` / `SessionEnd` / `PreCompact` hooks. Straightforward.
+**Recall on every prompt** is what makes the palace get used. The wake-up is a fixed summary and
+the model rarely calls `mempalace_search` on its own, so `recall` searches with the prompt itself
+(~1-2 s) and injects hits only above `MEMPALACE_RECALL_MIN_SIM` (default 0.5, calibrated for the default `minilm` embedder). Below that it adds
+nothing, so an unrelated prompt costs no tokens. Prompts under 20 characters and slash commands are
+skipped.
 
-*Recall* is the part that surprises people. MemPalace's own `session-start` hook injects
-**nothing** — read it, it only initialises tracking state and returns `{}`. MemPalace expects the
-model to pull memory on demand through MCP tools, whereas claude-mem pushed context in at session
-start. So two pieces restore that behaviour:
+`mempalace-rules.sh` writes a short block into `~/.claude/CLAUDE.md` telling the model to search
+the palace before answering about past work, quote results verbatim, and say so when the palace
+has nothing rather than guessing.
 
-1. `mempalace-session-start.sh` wraps MemPalace's real hook and appends `mempalace wake-up`
-   (~800 tokens of L0/L1 context) as `additionalContext`, so memory reaches every session
-   unprompted. It resolves the wing from your git root, so you get *this* repo's memory.
+MemPalace stores verbatim text and embeds locally. No API key, no per-session model call, nothing
+to exhaust, which is why it replaced claude-mem here: its observer needs an LLM call per session
+and fails closed when that allowance runs out.
 
-   This only works because the migration mines **one wing per root project**. Mined flat into a
-   single wing, `wake-up` ignores your cwd and returns whichever project it feels like — you sit
-   in one repo and get another repo's July notes. claude-mem's project scoping was implicit;
-   here it has to be built.
-2. `mempalace-rules.sh` writes a short block into `~/.claude/CLAUDE.md` telling the model to
-   search the palace before answering about past work, quote results verbatim, and say so when
-   the palace has nothing rather than guessing.
+### Re-filing a palace built before this
 
-Without (1) nothing is recalled automatically. Without (2) the model has the tools but no reason
-to reach for them. The MCP alone gives you neither.
+Palaces built earlier hold a flat `sessions` wing, per-worktree wings and month-sized claude-mem
+chunks that start mid-sentence. Stop every `mempalace-mcp` process (they hold the palace lock),
+back up, then:
 
-MemPalace stores verbatim text and embeds locally (`all-MiniLM-L6-v2`). No API key, no
-per-session model call, nothing to exhaust — which is why it replaced claude-mem here, whose
-observer needs an LLM call per session and fails closed when that allowance runs out.
+```bash
+cp -cR ~/.mempalace/palace ~/.mempalace/palace.bak       # APFS clone; plain cp -R elsewhere
+bash ~/.claude/skills/bootstrap/mempalace-hook.sh reorg --reimport-claude-mem
+```
+
+`reorg` splits every wing holding transcripts by repo, using `mempalace wings split` with the
+targets rewritten to repo names. `--reimport-claude-mem` re-exports one file per memory, then drops
+the drawers mined from the earlier export and mines each project into its repo wing. It needs
+`~/.claude-mem/claude-mem.db` plus `node` and `sqlite3`, so run it before any
+`--purge-claude-mem`. Without the database, run plain `reorg`. It waits out the palace lock that
+live sessions' Stop hooks take, and re-running it is safe. Expect about an hour per 30k memories.
 
 ### Migrating an existing claude-mem database
 
@@ -169,15 +194,14 @@ bash ~/.claude/skills/bootstrap/mempalace-migrate.sh --remove-claude-mem   # ...
 | `--fresh` | rebuild the palace per-project. **Needed if an earlier run mined everything into one flat `claude_mem_export` wing** — the script detects that and refuses to stack on top of it. |
 | `--with-cloud` | also install the third-party cloud plugin (see below). |
 
-Everything claude-mem stored is covered: `observations` and `session_summaries` become the
-month-split markdown that gets mined, `user_prompts` are mined as their own `_prompts` wing, and
+Everything claude-mem stored is covered: `observations` and `session_summaries` become one
+markdown file each, mined into the project's wing, `user_prompts` are mined as their own `prompts` wing, and
 `tool_uses` + `sdk_sessions` are dumped to JSON in the archive. Those last two live nowhere else —
 without them, deleting `~/.claude-mem` loses them for good.
 
-The export is a read-only SQLite→markdown transform — **no LLM calls, no cost**. Observations are
-split into one file per project per month on purpose: MemPalace skips any file over its
-per-file chunk cap **silently**, so a single large project file will appear to import and won't.
-The migration script surfaces that count; don't ignore it.
+The export is a read-only SQLite→markdown transform — **no LLM calls, no cost**. One file per
+memory means every drawer starts at that memory's title, and no file comes near MemPalace's
+per-file chunk cap, which skips oversized files **silently**.
 
 Your original transcripts in `~/.claude/projects/` are the higher-fidelity source — claude-mem's
 observations are LLM summaries *of* them. To file those verbatim instead:

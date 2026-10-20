@@ -1,5 +1,5 @@
 #!/bin/sh
-# check — offline lint for the kit: shell syntax, agent-memory selfcheck, handoff and crew-cost tests, the installer test, JSON.
+# check — offline lint for the kit: shell syntax, agent-memory selfcheck, handoff, crew-cost and mempalace-hooks tests, the installer test, JSON.
 set -u
 cd "$(dirname "$0")/.." || exit 1
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/ai-tools-check.XXXXXX"); trap 'rm -rf "$tmp"' EXIT
@@ -17,7 +17,7 @@ run() {
 }
 
 seen=" "
-for f in */install.sh */bin/* */hooks/*.sh */skills/*/*.sh memory/tests/smoke.sh team/tests/*/run.sh tests/*.sh bin/check; do
+for f in */install.sh */bin/* */hooks/*.sh */skills/*/*.sh */tests/*.sh memory/tests/smoke.sh team/tests/*/run.sh tests/*.sh bin/check; do
   [ -f "$f" ] || continue
   case $seen in *" $f "*) continue;; esac
   seen="$seen$f "
@@ -39,6 +39,9 @@ if command -v python3 >/dev/null 2>&1; then
 else
   row SKIP "team/tests/crew-cost/run.sh (python3 not installed)"
 fi
+
+if sh bootstrap/tests/mempalace-hooks.sh > "$tmp/out" 2>&1; then row PASS "bootstrap/tests/mempalace-hooks.sh"; else row FAIL "bootstrap/tests/mempalace-hooks.sh"; fi
+indent "$tmp/out"
 
 if sh tests/install.sh > "$tmp/out" 2>&1; then row PASS "tests/install.sh"; else row FAIL "tests/install.sh"; fi
 indent "$tmp/out"

@@ -46,12 +46,9 @@ if [ -f "$HOME/.claude-mem/claude-mem.db" ]; then
 else note "· no claude-mem database found — nothing to export"; fi
 
 # 3. ingest — one wing per root project -----------------------------------------
-# Mining everything into a single wing makes `mempalace wake-up` return whichever
-# project it likes regardless of your cwd, so session-start injects the wrong
-# repo's memory. One wing per root project keeps recall scoped.
-# An earlier version of this script mined everything into one flat wing, which
-# makes `wake-up` ignore your cwd and inject some other repo's memory. Detect
-# that and rebuild rather than stacking per-wing copies on top of it.
+# Hooks save and recall under the repo's wing, so each project is mined into its
+# repo wing. An earlier version mined everything into one flat wing that no repo
+# reads; detect that and rebuild rather than stacking per-wing copies on top of it.
 if [ "$SKIP_MINE" = 0 ] && mempalace status 2>/dev/null | grep -q "WING: claude_mem_export"; then
   if [ "$FRESH" = 1 ]; then
     PALACE_DIR="${MEMPALACE_PALACE:-$HOME/.mempalace/palace}"
@@ -59,10 +56,18 @@ if [ "$SKIP_MINE" = 0 ] && mempalace status 2>/dev/null | grep -q "WING: claude_
       && note "✓ old flat palace moved aside; rebuilding per-project"
   else
     note "⚠ this palace has a flat 'claude_mem_export' wing from an earlier migration."
-    note "⚠ session-start will inject the WRONG project's memory until it is rebuilt."
+    note "⚠ nothing in it is recalled for any repo until it is rebuilt."
     note "⚠ re-run with --fresh to rebuild per-project (the export is reused; only mining repeats)."
     SKIP_MINE=1
   fi
+fi
+
+PALACE_DB="${MEMPALACE_PALACE:-$HOME/.mempalace/palace}/chroma.sqlite3"
+if [ "$SKIP_MINE" = 0 ] && [ -f "$PALACE_DB" ] && have sqlite3 \
+   && [ "$(sqlite3 -readonly "$PALACE_DB" "SELECT count(*) FROM embedding_metadata WHERE key='source_file' AND string_value LIKE '$EXPORT_DIR/%'" 2>/dev/null)" -gt 0 ] 2>/dev/null; then
+  note "⚠ the palace already holds a claude-mem import; mining again would duplicate it."
+  note "⚠ to re-import cleanly: bash \"$SELF_DIR/mempalace-hook.sh\" reorg --reimport-claude-mem"
+  SKIP_MINE=1
 fi
 
 if [ "$SKIP_MINE" = 0 ] && [ -d "$EXPORT_DIR/projects" ]; then
@@ -70,7 +75,7 @@ if [ "$SKIP_MINE" = 0 ] && [ -d "$EXPORT_DIR/projects" ]; then
   TOTAL_SKIP=0
   for d in "$EXPORT_DIR"/projects/*/; do
     [ -d "$d" ] || continue
-    DRY="$(mempalace mine "$d" --wing "$(basename "$d")" --dry-run 2>&1)"
+    DRY="$(mempalace mine "$d" --wing "$(bash "$SELF_DIR/mempalace-hook.sh" wing-name "$(basename "$d")" || basename "$d")" --dry-run 2>&1)"
     if echo "$DRY" | grep -q "chunk cap"; then
       TOTAL_SKIP=1
       note "⚠ $(basename "$d"): $(echo "$DRY" | grep 'chunk cap' | tr -d '\n')"
@@ -81,7 +86,7 @@ if [ "$SKIP_MINE" = 0 ] && [ -d "$EXPORT_DIR/projects" ]; then
   note "→ mining (local embeddings, no API key; CPU-heavy, can take a while)…"
   for d in "$EXPORT_DIR"/projects/*/; do
     [ -d "$d" ] || continue
-    W="$(basename "$d")"
+    W="$(bash "$SELF_DIR/mempalace-hook.sh" wing-name "$(basename "$d")")" || W="$(basename "$d")"
     printf '    %-40s' "$W"
     mempalace mine "$d" --wing "$W" 2>&1 | grep -oE "Drawers filed: [0-9]+" | tail -1
   done
@@ -95,31 +100,7 @@ if have claude; then
   note "✓ mempalace MCP registered (user scope)"
 fi
 
-if have python3; then
-  cp -p "$CLAUDE_DIR/settings.json" "$CLAUDE_DIR/settings.json.bak-$(ts)" 2>/dev/null
-  CLAUDE_DIR="$CLAUDE_DIR" python3 - <<'PY'
-import json, os, collections
-p = os.path.join(os.environ['CLAUDE_DIR'], 'settings.json')
-d = json.load(open(p), object_pairs_hook=collections.OrderedDict) if os.path.exists(p) else collections.OrderedDict()
-hooks = d.setdefault('hooks', collections.OrderedDict())
-added = []
-for event, name in (('SessionStart','session-start'),('Stop','stop'),
-                    ('SessionEnd','session-end'),('PreCompact','precompact')):
-    groups = hooks.setdefault(event, [])
-    if any('mempalace' in str(h.get('command','')) for g in groups for h in g.get('hooks',[])):
-        continue
-    if event == 'SessionStart':
-        cmd = 'bash "$HOME/.claude/skills/bootstrap/mempalace-session-start.sh"'
-    else:
-        cmd = ('[ -x "$HOME/.local/bin/mempalace" ] && "$HOME/.local/bin/mempalace" '
-               f'hook run --hook {name} --harness claude-code || printf \'{{}}\\n\'')
-    groups.append(collections.OrderedDict([("hooks", [
-        collections.OrderedDict([("type","command"),("command",cmd)])])]))
-    added.append(event)
-json.dump(d, open(p,'w'), indent=2)
-print("  ✓ capture hooks:", ", ".join(added) if added else "already present")
-PY
-fi
+have python3 && bash "$SELF_DIR/mempalace-wire-hooks.sh"
 
 [ -f "$SELF_DIR/mempalace-rules.sh" ] && bash "$SELF_DIR/mempalace-rules.sh"
 

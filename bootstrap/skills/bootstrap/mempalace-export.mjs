@@ -50,50 +50,45 @@ for (const project of projects) {
   );
 
   // One directory per ROOT project (the segment before the first '/'), so each
-  // root can be mined as its own MemPalace wing. A single flat wing makes
-  // `mempalace wake-up` return whichever project it likes, ignoring your cwd.
+  // root is mined into its repo's wing, the one the hooks save and recall under.
   const root = project.includes('/') ? project.slice(0, project.indexOf('/')) : project;
   const sub = project.includes('/') ? project.slice(project.indexOf('/') + 1) : '';
   const dir = sub ? join(OUT, 'projects', slug(root), slug(sub)) : join(OUT, 'projects', slug(root));
   mkdirSync(dir, { recursive: true });
-  const months = new Map();
-  const bucket = (m) => {
-    if (!months.has(m)) months.set(m, [`# ${project} — ${m}`, '']);
-    return months.get(m);
+  // One file per memory: the miner chunks each file from its start, so every drawer
+  // opens on the memory's own title instead of mid-sentence in a monthly dump.
+  const write = (when, name, lines) => {
+    const monthDir = join(dir, (when || 'unknown').slice(0, 7));
+    mkdirSync(monthDir, { recursive: true });
+    writeFileSync(join(monthDir, `${(when || 'unknown').slice(0, 10)}-${name}.md`), lines.join('\n'));
   };
 
-  let day = '';
   for (const o of obs) {
-    const md = bucket((o.created_at || 'unknown').slice(0, 7));
-    const d = (o.created_at || '').slice(0, 10);
-    if (d !== day) { day = d; md.push('', `## ${d}`, ''); }
-    md.push(`### ${o.title || '(untitled)'}`, '');
+    const md = [`# ${o.title || '(untitled)'}`, ''];
     if (o.subtitle) md.push(`*${o.subtitle}*`, '');
-    md.push(`- **type:** \`${o.type}\`  **when:** ${o.created_at}`, '');
+    md.push(`- **project:** ${project}  **type:** \`${o.type}\`  **when:** ${o.created_at}`, '');
+    if (o.narrative) md.push(o.narrative, '');
     const facts = arr(o.facts);
     if (facts.length) { md.push('**Facts**', ''); for (const f of facts) md.push(`- ${f}`); md.push(''); }
-    if (o.narrative) md.push(o.narrative, '');
     const fm = arr(o.files_modified);
     if (fm.length) md.push(`**Files modified:** ${fm.map((f) => `\`${f}\``).join(', ')}`, '');
     const cs = arr(o.concepts);
     if (cs.length) md.push(`**Concepts:** ${cs.join(', ')}`, '');
-    md.push('---', '');
+    write(o.created_at, `${o.id}-${slug(o.title || 'untitled').slice(0, 60)}`, md);
 
     appendFileSync(jsonl, JSON.stringify({ ...o, project, facts, concepts: cs,
       files_read: arr(o.files_read), files_modified: fm }) + '\n');
     total++;
   }
 
-  for (const s of sums) {
-    const md = bucket((s.created_at || 'unknown').slice(0, 7));
-    md.push(`## Session — ${(s.created_at || '').slice(0, 10)} — ${(s.request || '(no request)').slice(0, 140)}`, '');
+  sums.forEach((s, i) => {
+    const md = [`# Session — ${(s.request || '(no request)').slice(0, 140)}`, '',
+      `- **project:** ${project}  **when:** ${s.created_at}`, ''];
     for (const [label, key] of [['Investigated','investigated'],['Learned','learned'],['Completed','completed'],['Next steps','next_steps']]) {
       if (s[key]) md.push(`**${label}:** ${s[key]}`, '');
     }
-    md.push('---', '');
-  }
-
-  for (const [month, lines] of months) writeFileSync(join(dir, `${month}.md`), lines.join('\n'));
+    write(s.created_at, `session-${slug(project)}-${i + 1}`, md);
+  });
 }
 
 const prompts = q(`SELECT content_session_id,prompt_number,prompt_text,created_at
@@ -134,8 +129,8 @@ writeFileSync(join(ARCHIVE, 'README.md'),
 ${total} observations across ${projects.length} projects, plus ${prompts.length} user prompts.
 Source: ${DB}
 
-- \`${OUT}/projects/<project>/<YYYY-MM>.md\` — human-readable, split by month so no file
-  trips MemPalace's per-file chunk cap (a single huge file is skipped SILENTLY).
+- \`${OUT}/projects/<project>/<YYYY-MM>/<date>-<id>-<title>.md\` — human-readable, one file per
+  observation or session summary, so each MemPalace drawer starts at a memory's title.
 - \`observations.jsonl\` — lossless, one JSON object per line.
 - \`user-prompts.jsonl\` — every prompt you typed.
 

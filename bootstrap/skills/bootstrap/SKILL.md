@@ -17,7 +17,7 @@ Most of this list exists for one reason: **an agent that can search, query a gra
 - **CodeGraph** — the `@colbymchenry/codegraph` CLI + its MCP server in Claude Code, then a built index of this repo. `codegraph explore` returns the relevant symbols' source *plus the call paths between them* in one call — the single biggest saving on any "what does this touch" question.
 - **graphify** — the `graphifyy` PyPI package (provides the `graphify` CLI; Python 3.10+, installed via uv/pipx) + the `/graphify` skill, plus an optional **per-commit auto-sync** that keeps the graph fresh with zero tokens. `graphify query|explain|path` answers relations that cross files and apps without opening any of them.
 - **ponytail** — the ponytail Claude Code plugin (lazy-senior-dev mode: YAGNI, stdlib-first, fewest lines).
-- **MemPalace** — the [MemPalace](https://github.com/MemPalace/mempalace) memory engine (`mempalace` PyPI package, installed via uv/pipx) + its MCP server + its **automatic capture hooks** (`SessionStart` loads memory, `Stop`/`SessionEnd`/`PreCompact` save it). Stores verbatim text with **local embeddings — no API key, no per-session LLM call, no quota to exhaust**.
+- **MemPalace** — the [MemPalace](https://github.com/MemPalace/mempalace) memory engine (`mempalace` PyPI package, installed via uv/pipx) + its MCP server + its **automatic hooks** (`SessionStart` loads the repo's wake-up, `UserPromptSubmit` recalls memories that match the prompt, `Stop`/`SessionEnd`/`PreCompact` save). Every hook files and reads under the repo's wing, so all worktrees of a repo share one memory. Stores verbatim text with **local embeddings — no API key, no per-session LLM call, no quota to exhaust**.
   The hooks are the part that makes memory automatic. The MCP alone only exposes tools the model *may* call; without the hooks nothing is saved on its own.
 - **Standard code-comment policy** — writes the required `## Code Comments` rules (no comments by default; one-line `why` only) into the repo's `CLAUDE.md` and any existing `AGENTS.md` / `AGENT.md`, so every project enforces the same standard.
 
@@ -54,8 +54,9 @@ If the command is missing, skip this section.
 6. **Prime MemPalace's memory (optional, heavy — but free).** Offer to file the repo into the palace:
    ```bash
    mempalace init "$root" --yes --no-llm
-   mempalace mine "$root"
+   mempalace mine "$root" --wing "$(bash ~/.claude/skills/bootstrap/mempalace-hook.sh wing "$root")"
    ```
+   Always pass that `--wing`: it is the name the hooks save and recall under, and the default (the directory name) differs for worktrees and hyphenated names.
    This is **zero-token** — embeddings run locally, the model is never called. It is still CPU/RAM heavy and can take a while on a big repo, so **ask before running**; run on confirm, skip otherwise. Check the dry run first (`mempalace mine "$root" --dry-run`) and relay the drawer count — if it reports *files skipped (chunk cap)*, say so rather than letting oversized files drop silently.
 
 7. **Augment CLAUDE.md + enforce the comment policy.** Two parts, both non-destructive (back up each file before editing):
@@ -66,7 +67,7 @@ If the command is missing, skip this section.
    ```bash
    bash ~/.claude/skills/bootstrap/mempalace-migrate.sh
    ```
-   It exports every claude-mem observation to month-split markdown (read-only, **no LLM calls**), mines it into the palace, and wires the capture hooks. Add `--remove-claude-mem` to disable the old plugin afterwards (its database is kept), or `--purge-claude-mem` to delete `~/.claude-mem` outright — **only offer purge once the user confirms recall works**. `--with-cloud` additionally installs the third-party MemPalace Cloud plugin; do not add it by default (see the README note — it auto-saves to `api.mempalace.cloud`, not the local palace).
+   It exports every claude-mem observation to one markdown file each (read-only, **no LLM calls**), mines each project into its repo wing, and wires the hooks. If the palace predates the per-repo hooks (a `sessions` wing or wings named after worktrees in `mempalace status`), offer `bash ~/.claude/skills/bootstrap/mempalace-hook.sh reorg --reimport-claude-mem` after a backup (see the README). Add `--remove-claude-mem` to disable the old plugin afterwards (its database is kept), or `--purge-claude-mem` to delete `~/.claude-mem` outright — **only offer purge once the user confirms recall works**. `--with-cloud` additionally installs the third-party MemPalace Cloud plugin; do not add it by default (see the README note — it auto-saves to `api.mempalace.cloud`, not the local palace).
 
    **Ask before running** — mining is CPU-heavy. Relay the dry-run's skipped-file count if it reports one: files over the chunk cap are dropped **silently**, so an unreported skip means memories quietly did not migrate.
 
