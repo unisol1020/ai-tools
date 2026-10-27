@@ -14,7 +14,7 @@ AI_TOOLS_EVAL_DIR=/tmp/evals evals/run.sh handoff-writes-doc   # keep the scratc
 
 | Case | Checks |
 |---|---|
-| `architect-uses-investigators` | Planning a CSV export for a two-sided fixture app (Express API + React page) makes the `architect` dispatch a `backend-investigator` or `frontend-investigator`, and the plan cites files as `path:line`. |
+| `architect-uses-investigators` | Planning a CSV export for a two-sided fixture app (Express API + React page) makes the `architect` dispatch a `backend-investigator` or `frontend-investigator`, and the plan cites files as `path:line`; the `plan-brief.html` beside the plan uses T3 theme vars and keeps the skeleton CSP, no `vh`, and no background or `height:100%` on bare `html`/`body`. |
 | `architect-local-change-no-scouts` | A one-line comment typo makes the `architect` dispatch no investigator at all, and the reply states the fix (`receive`). |
 | `dispatch-routes-intent` | Three sub-runs (`a`, `b`, `c`) in a tiny orders app, each a plain-language prompt with no agent named: "we need to test this" reaches the `qa-run` skill or `manual-qa`; "fix this in the api: …" reaches `backend-engineer`; "the orders page looks bad on mobile … fix it" reaches `frontend-engineer`. |
 | `memory-agent-saves-on-surprise` | Runs `memory/tests/smoke.sh` (a memory-enabled agent receives the protocol from the hook, writes one entry, and it lands in the main checkout even from a worktree). No prompt of its own; the case is only an `assert.sh`. |

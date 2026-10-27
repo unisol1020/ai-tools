@@ -8,7 +8,7 @@ The **crew of subagents** Claude Code delegates real work to — the ones that p
 
 | Agent | Role | Writes |
 |-------|------|--------|
-| `architect` | The single **planning** authority. Gathers all context (CLAUDE.md hierarchy, tickets, Figma, DB, running app via MCPs), grills you until the task is understood, and emits self-contained plan files + a parallel-execution graph + a per-phase babysit protocol. Plans; never implements. | plan files only |
+| `architect` | The single **planning** authority. Gathers all context (CLAUDE.md hierarchy, tickets, Figma, DB, running app via MCPs), grills you until the task is understood, and emits self-contained plan files + a parallel-execution graph + a per-phase babysit protocol, plus a one-page brief (drawn in the chat as a card in T3 Code). Plans; never implements. | plan files only |
 | `backend-investigator` | Read-only scout (inherits the session model) the architect sends ahead to map the backend slice (routes, services, schemas, consumers, verify commands) with `path:line` evidence. Only the architect dispatches it (or the parent, when the architect returns `NEED:`). | Context Bundle only |
 | `frontend-investigator` | Read-only scout (inherits the session model) the architect sends ahead to map the frontend slice (pages, components, hooks/stores, API clients, the sibling to mirror) with `path:line` evidence. Only the architect dispatches it (or the parent, when the architect returns `NEED:`). | Context Bundle only |
 | `backend-engineer` | Implements **server-side** work — endpoints, services, DB queries/migrations, jobs, webhooks, server config. | production code |
@@ -102,7 +102,7 @@ claude plugin install mattpocock-skills@mattpocock
 
 Neither is vendored into this repo. Restart Claude Code after installing and the architect routes its Phase-1 questioning through them.
 
-**In [T3 Code](https://github.com/pingdotgg/t3code), neither skill is used.** T3 renders Claude's `AskUserQuestion` as native question cards in the thread, so the grill runs there: rounds of up to four questions, the recommendation first as `(Recommended)`, each round built from the last one's answers, closing on one question that states the agreed end solution (`Agreed` settles the solution only; the build go/no-go stays separate). T3 keeps the header, question, option labels and descriptions and `multiSelect`, and drops `preview`. The parent knows it is in T3 from its system prompt, which says so. Name `/grill-with-ui` or `/grill-me` to use one anyway. The full rule is the `### In T3 Code` part of the global `CLAUDE.md` block below.
+**In [T3 Code](https://github.com/pingdotgg/t3code), neither skill is used.** T3 renders Claude's `AskUserQuestion` as native question cards in the thread, so the grill runs there: rounds of up to four questions, the recommendation first as `(Recommended)`, each round built from the last one's answers, closing on one question that states the agreed end solution (`Agreed` settles the solution only; the build go/no-go stays separate). T3 keeps the header, question, option labels and descriptions and `multiSelect`, and drops `preview`. The parent knows it is in T3 from its system prompt, which says so. Name `/grill-with-ui` or `/grill-me` to use one anyway. The full rule is the `### In T3 Code` part of the global `CLAUDE.md` block below. In T3 the architect's two hand-offs also arrive as cards in the chat: a Way-Finding card before the grill and the plan brief before go/no-go. The architect writes and previews each page (a subagent cannot draw in the chat); the main thread draws it with `html_render`, unchanged.
 
 ### Let the architect call it automatically (recommended tweak)
 
@@ -143,6 +143,7 @@ When the system prompt says you are running in T3 Code, do not open `grill-with-
 - T3 keeps only `header`, `question`, option `label`/`description` and `multiSelect`. It drops `preview`, so put any comparison in the descriptions. Answers are keyed by question text, so no two questions in a round may share it.
 - Close once every open decision is answered and the last round opened no new branch: one question whose text is a short paragraph stating the agreed end solution (goal, shape, key flows, what done means), with `Agreed (Recommended)` against `Change something`. On a bare `Change something`, ask which decisions to reopen (`multiSelect`, one option per decision), grill those, then close again.
 - `Agreed` settles the solution only; it is never approval to build. Send the architect that paragraph verbatim as the agreed end solution, plus anything I typed, and put further detail under the per-decision answers.
+- When the architect's report has a `CARD:` (Way-Finding) or `BRIEF:` (plan) line, Read that file and `html_render` its HTML unchanged with that title and `height` = min(height, 2000) (1200 when unmeasured), say nothing about it, then in the same turn start the grill (CARD) or ask the go/no-go `AskUserQuestion` right under it (BRIEF). Never re-write the page; if `html_render` fails, give the path instead.
 ```
 
 ## Requirements

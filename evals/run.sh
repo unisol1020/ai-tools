@@ -93,8 +93,8 @@ run_claude() {  # $1 work dir, $2 prompt file; exec so the watchdog's kill reach
   pkill -P "$wd" 2>/dev/null; kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
   return $rc
 }
-find_transcript() {  # newest *.jsonl under ~/.claude/projects/<cwd with every / replaced by ->
-  d="$CLAUDE_DIR/projects/$(printf '%s' "$1" | tr / -)"
+find_transcript() {  # newest *.jsonl under ~/.claude/projects/<cwd with every non-alphanumeric replaced by ->
+  d="$CLAUDE_DIR/projects/$(printf '%s' "$1" | sed 's/[^A-Za-z0-9]/-/g')"
   [ -d "$d" ] || return 1
   ls -t "$d"/*.jsonl 2>/dev/null | head -n 1
 }
