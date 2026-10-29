@@ -126,7 +126,8 @@ link_local() {  # make <base>/.claude/agent-memory-local a symlink to $PROJ, mer
     done
     rm -rf "$wt"
   fi
-  [ "$(readlink "$wt" 2>/dev/null)" = "$PROJ" ] || { rm -f "$wt"; ln -s "$PROJ" "$wt"; }
+  # -n: concurrent hooks race here, and plain ln follows a link another hook just made, nesting a self-link inside $PROJ.
+  [ "$(readlink "$wt" 2>/dev/null)" = "$PROJ" ] || ln -sfn "$PROJ" "$wt"
 }
 exclude_project_dir() {
   git -C "$MAIN" check-ignore -q .claude/agent-memory-local 2>/dev/null && return 0
@@ -140,6 +141,7 @@ exclude_project_dir() {
 }
 cmd_ensure() {
   mkdir -p "$PROJ/_shared" "$PROJ/_skills" "$CURATOR" "$GLOBAL/_skills" || return 1
+  [ -L "$PROJ/agent-memory-local" ] && rm -f "$PROJ/agent-memory-local"
   names="$*"; [ -n "$names" ] || names=$(memory_agents)
   for a in $names; do mkdir -p "$PROJ/$a" "$GLOBAL/$a"; done
   exclude_project_dir
@@ -425,6 +427,12 @@ cmd_selfcheck() {
   mkdir -p "$repo/apps/web"; run "$repo/apps/web" ensure
   t "ensure links a subdirectory launch to MAIN" test "$(readlink "$repo/apps/web/.claude/agent-memory-local")" = "$proj"
   t "ensure never links MAIN to itself" test ! -L "$proj"
+  ln -s "$proj" "$proj/agent-memory-local"; run "$repo" ensure
+  t "ensure removes a self-link nested in MAIN" test ! -L "$proj/agent-memory-local"
+  g worktree add -q "$repo/.claude/worktrees/wt2" -b wt2
+  for i in 1 2 3 4 5 6; do run "$repo/.claude/worktrees/wt2" ensure 2>/dev/null & done; wait
+  t "concurrent ensure never nests a self-link in MAIN" test ! -L "$proj/agent-memory-local"
+  t "concurrent ensure links the worktree" test "$(readlink "$repo/.claude/worktrees/wt2/.claude/agent-memory-local")" = "$proj"
   t "ensure excludes the project dir from git" g check-ignore -q .claude/agent-memory-local
   t "ensure writes the exclude into the common dir" grep -qxF '.claude/agent-memory-local/' "$repo/.git/info/exclude"
   run "$repo" ensure
