@@ -43,3 +43,4 @@ with open(p, 'w') as f:
     f.write('\n')
 PY
 echo "  ✓ mempalace hooks wired (SessionStart wake-up, Stop/SessionEnd/PreCompact capture, UserPromptSubmit recall)"
+bash "$(dirname "${BASH_SOURCE[0]}")/mempalace-hook.sh" cap-mines </dev/null

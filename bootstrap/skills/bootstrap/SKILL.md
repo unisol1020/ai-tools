@@ -54,9 +54,9 @@ If the command is missing, skip this section.
 6. **Prime MemPalace's memory (optional, heavy — but free).** Offer to file the repo into the palace:
    ```bash
    mempalace init "$root" --yes --no-llm
-   mempalace mine "$root" --wing "$(bash ~/.claude/skills/bootstrap/mempalace-hook.sh wing "$root")"
+   MEMPALACE_EMBEDDING_THREADS=auto mempalace mine "$root" --wing "$(bash ~/.claude/skills/bootstrap/mempalace-hook.sh wing "$root")"
    ```
-   Always pass that `--wing`: it is the name the hooks save and recall under, and the default (the directory name) differs for worktrees and hyphenated names.
+   Always pass that `--wing`: it is the name the hooks save and recall under, and the default (the directory name) differs for worktrees and hyphenated names. `MEMPALACE_EMBEDDING_THREADS=auto` lifts the 1-thread cap the capture hooks run under, because the user is waiting on this mine.
    This is **zero-token** — embeddings run locally, the model is never called. It is still CPU/RAM heavy and can take a while on a big repo, so **ask before running**; run on confirm, skip otherwise. Check the dry run first (`mempalace mine "$root" --dry-run`) and relay the drawer count — if it reports *files skipped (chunk cap)*, say so rather than letting oversized files drop silently.
 
 7. **Augment CLAUDE.md + enforce the comment policy.** Two parts, both non-destructive (back up each file before editing):

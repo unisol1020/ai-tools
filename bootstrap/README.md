@@ -137,6 +137,13 @@ Python:
 | `SessionEnd` | saves on close |
 | `PreCompact` | saves before context compaction |
 
+**Saving never competes with the app in front.** Each save spawns a background `mempalace mine`,
+and a busy day runs dozens of them. MemPalace's default of half the cores per mine made the browser
+stutter. `mempalace-wire-hooks.sh` sets `embedding_threads: 1` in MemPalace's config, leaving an
+existing value alone. On macOS, `mempalace_hooks.py` also starts each capture mine under
+`taskpolicy -b`, which keeps it on the efficiency cores with throttled I/O. The priming mines in
+`/bootstrap` and `mempalace-migrate.sh` run at full speed (`MEMPALACE_EMBEDDING_THREADS=auto`).
+
 **One wing per repo, not per directory.** Saving and recall have to agree on the wing, or recall
 reads a wing nothing is saved into. MemPalace names a session's wing after the leaf of its cwd, so
 a T3 worktree (`~/.t3/worktrees/mono/t3-1a2b`) or an Orca workspace

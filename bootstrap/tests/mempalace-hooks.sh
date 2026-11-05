@@ -5,6 +5,7 @@ REPO=$(cd "$(dirname "$0")/../.." && pwd -P)
 SK="$REPO/bootstrap/skills/bootstrap"
 # Fixtures live outside /tmp: temp dirs deliberately resolve to no project.
 TMP=$(mkdir -p "$REPO/.test-tmp" && cd "$(mktemp -d "$REPO/.test-tmp/mp-hooks.XXXXXX")" && pwd -P); trap 'rm -rf "$TMP"; rmdir "$REPO/.test-tmp" 2>/dev/null' EXIT
+export MEMPALACE_CONFIG_DIR="$TMP/mempalace"
 fail=0
 ok() { name=$1; shift; if "$@" >/dev/null 2>&1; then echo "PASS  $name"; else echo "FAIL  $name"; fail=1; fi; }
 
@@ -24,6 +25,10 @@ ok "claude worktree -> project"       [ "$(root "/nowhere/proj/.claude/worktrees
 ok "T3 scratch -> home"               [ "$(root "/nowhere/.t3/scratch/2026-10-19-x")" = "$TMP/home" ]
 ok "temp dir -> home"                 [ "$(root "/private/tmp/claude-501/evals/x")" = "$TMP/home" ]
 
+mined() { python3 -c 'import sys, types; sys.path.insert(0, sys.argv[1]); import mempalace_hooks as m
+seen = []; h = m.background_mines(types.SimpleNamespace(_spawn_mine=seen.append)); h._spawn_mine(["py", "-m", "mempalace", "mine", "x"]); print(" ".join(seen[0]))' "$SK"; }
+ok "mine spawns at background priority" [ "$(mined)" = "/usr/sbin/taskpolicy -b py -m mempalace mine x" ]
+
 S="$TMP/claude/settings.json"; mkdir -p "$TMP/claude"
 cat > "$S" <<'JSON'
 {"hooks":{"Stop":[{"hooks":[{"type":"command","command":"[ -x \"$HOME/.local/bin/mempalace\" ] && \"$HOME/.local/bin/mempalace\" hook run --hook stop --harness claude-code || printf '{}\\n'"}]},{"hooks":[{"type":"command","command":"other-stop.sh"}]}],
@@ -37,6 +42,12 @@ ok "Stop goes through mempalace-hook.sh"    jq -e '.hooks.Stop | map(.hooks[].co
 ok "unrelated Stop hook kept"               jq -e '.hooks.Stop | map(.hooks[].command) | index("other-stop.sh")' "$S"
 ok "hook sharing a group with mempalace kept" jq -e '.hooks.SessionStart | map(select(.matcher == "startup") | .hooks[].command) | index("shared-start.sh")' "$S"
 for e in SessionStart SessionEnd PreCompact UserPromptSubmit; do ok "$e wired once" [ "$(n $e)" = 1 ]; done
+if command -v mempalace >/dev/null 2>&1; then
+  ok "wiring caps mines to 1 thread" jq -e '.embedding_threads == 1' "$MEMPALACE_CONFIG_DIR/config.json"
+  echo '{"embedding_threads": 3}' > "$MEMPALACE_CONFIG_DIR/config.json"
+  bash "$SK/mempalace-hook.sh" cap-mines </dev/null >/dev/null
+  ok "existing thread count kept"    jq -e '.embedding_threads == 3' "$MEMPALACE_CONFIG_DIR/config.json"
+else echo "SKIP  mine thread cap (mempalace not installed)"; fi
 
 mkdir -p "$TMP/bad" && printf '{bad' > "$TMP/bad/settings.json"
 ok "invalid settings.json fails loudly" sh -c '! CLAUDE_CONFIG_DIR="$1" bash "$2"' _ "$TMP/bad" "$SK/mempalace-wire-hooks.sh"

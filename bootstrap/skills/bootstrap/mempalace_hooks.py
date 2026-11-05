@@ -6,6 +6,7 @@ Run with MemPalace's own interpreter (see mempalace-hook.sh):
   hook <name>              MemPalace's capture hook, filing into the repo's wing
   session-start            capture hook + inject the repo's wake-up text
   recall                   UserPromptSubmit: inject past memories relevant to the prompt
+  cap-mines                set embedding_threads to 1 in MemPalace's config unless already set
 """
 import json
 import os
@@ -101,6 +102,36 @@ def patch_capture():
     return hooks_cli
 
 
+TASKPOLICY = "/usr/sbin/taskpolicy"
+
+
+def background_mines(hooks_cli):
+    """Run `mempalace mine` at Darwin background priority (E-cores, throttled I/O), so it never competes with the app in front."""
+    spawn = getattr(hooks_cli, "_spawn_mine", None)
+    if spawn and os.access(TASKPOLICY, os.X_OK):
+        hooks_cli._spawn_mine = lambda cmd, *a, **k: spawn([TASKPOLICY, "-b", *cmd], *a, **k)
+    return hooks_cli
+
+
+def cap_mine_threads():
+    """MemPalace defaults to half the cores per mine; capture mines fire on every Stop, so one thread is plenty."""
+    from mempalace.config import MempalaceConfig
+
+    cfg = MempalaceConfig()
+    cfg.init()
+    path = os.path.join(cfg.config_dir, "config.json")
+    with open(path) as f:
+        conf = json.load(f)
+    if "embedding_threads" in conf:
+        print(f"  ✓ mempalace embedding_threads already {conf['embedding_threads']}")
+        return
+    conf["embedding_threads"] = 1
+    with os.fdopen(os.open(path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
+        json.dump(conf, f, indent=2)
+    os.replace(path + ".tmp", path)
+    print("  ✓ mempalace mines capped to 1 embedding thread")
+
+
 def emit(event, text):
     print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": text}}))
 
@@ -116,7 +147,7 @@ def read_stdin():
 def run_capture(name, raw):
     import io
 
-    hooks_cli = patch_capture()
+    hooks_cli = background_mines(patch_capture())
     sys.stdin = io.StringIO(raw)
     hooks_cli.run_hook(name, "claude-code")
 
@@ -188,6 +219,8 @@ def main(argv):
         session_start()
     elif cmd == "recall":
         recall()
+    elif cmd == "cap-mines":
+        cap_mine_threads()
     else:
         sys.exit(__doc__)
 

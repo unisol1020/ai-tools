@@ -88,7 +88,7 @@ if [ "$SKIP_MINE" = 0 ] && [ -d "$EXPORT_DIR/projects" ]; then
     [ -d "$d" ] || continue
     W="$(bash "$SELF_DIR/mempalace-hook.sh" wing-name "$(basename "$d")")" || W="$(basename "$d")"
     printf '    %-40s' "$W"
-    mempalace mine "$d" --wing "$W" 2>&1 | grep -oE "Drawers filed: [0-9]+" | tail -1
+    MEMPALACE_EMBEDDING_THREADS=auto mempalace mine "$d" --wing "$W" 2>&1 | grep -oE "Drawers filed: [0-9]+" | tail -1
   done
   mempalace status 2>&1 | grep -i drawers | sed 's/^/    /'
 fi
